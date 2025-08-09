@@ -52,7 +52,7 @@ class AuthController extends Controller
         ]);
 
         // إرسال رابط التحقق من الإيميل
-        $token = \Str::random(60);
+        $token = Str::random(60);
 
         EmailVerification::create([
             'email' => $request->email,
@@ -411,7 +411,7 @@ class AuthController extends Controller
         }
 
         // For resending verification link, we need to generate a new token.
-        $token = \Str::random(60);
+        $token = Str::random(60);
         EmailVerification::updateOrCreate(
             ['email' => $request->email],
             ['token' => $token, 'expires_at' => now()->addMinutes(60)] // extend expiry

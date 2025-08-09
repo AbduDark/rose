@@ -1,4 +1,3 @@
-
 <?php
 
 namespace App\Http\Middleware;
@@ -25,7 +24,7 @@ class CheckPaymentAccess
 
         // User can only access their own payments
         $payment = Payment::find($paymentId);
-        
+
         if (!$payment || $payment->user_id !== $user->id) {
             return response()->json(['message' => 'Access denied'], 403);
         }

@@ -1,4 +1,3 @@
-
 <?php
 
 namespace App\Http\Controllers\Api;
@@ -300,7 +299,7 @@ class PaymentController extends Controller
     public function getUserPaymentHistory(Request $request)
     {
         $user = $request->user();
-        
+
         $payments = Payment::with(['course:id,title,price'])
             ->where('user_id', $user->id)
             ->orderBy('created_at', 'desc')

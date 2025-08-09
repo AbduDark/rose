@@ -1,4 +1,3 @@
-
 <?php
 
 namespace App\Mail;
@@ -9,7 +8,7 @@ use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class EmailVerificationMail extends Mailable
+class SendPinMail extends Mailable
 {
     use Queueable, SerializesModels;
 

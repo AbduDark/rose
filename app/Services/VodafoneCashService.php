@@ -1,4 +1,3 @@
-
 <?php
 
 namespace App\Services;
@@ -28,7 +27,7 @@ class VodafoneCashService
     {
         // Remove any spaces or special characters
         $cleanNumber = preg_replace('/[^0-9]/', '', $number);
-        
+
         // Check if it's a valid Egyptian mobile number starting with 010
         return preg_match('/^010[0-9]{8}$/', $cleanNumber);
     }
@@ -39,7 +38,7 @@ class VodafoneCashService
     public function validateMobileNumber($number)
     {
         $cleanNumber = preg_replace('/[^0-9]/', '', $number);
-        
+
         // Check if it's a valid Egyptian mobile number
         return preg_match('/^01[0-9]{9}$/', $cleanNumber);
     }
@@ -60,7 +59,7 @@ class VodafoneCashService
         try {
             // This would be the actual API call to Vodafone Cash
             // For development, we'll simulate the verification
-            
+
             if (empty($this->merchantId) || empty($this->merchantKey)) {
                 Log::warning('Vodafone Cash API credentials not configured');
                 return [

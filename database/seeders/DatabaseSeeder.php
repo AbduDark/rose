@@ -5,6 +5,10 @@ namespace Database\Seeders;
 use App\Models\User;
 use App\Models\Course;
 use App\Models\Lesson;
+use App\Models\Subscription;
+use App\Models\Rating;
+use App\Models\Favorite;
+use App\Models\Comment;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -80,7 +84,7 @@ class DatabaseSeeder extends Seeder
             'video_url' => 'https://example.com/video2-male.mp4',
             'duration_minutes' => 45,
             'order' => 2,
-            'content' => 'محتوى الدرس للأولاد...',     
+            'content' => 'محتوى الدرس للأولاد...',
             'is_free' => false,
             'target_gender' => 'male',
         ]);
@@ -92,7 +96,7 @@ class DatabaseSeeder extends Seeder
             'video_url' => 'https://example.com/video2-female.mp4',
             'duration_minutes' => 45,
             'order' => 2,
-            'content' => 'محتوى الدرس للبنات...',     
+            'content' => 'محتوى الدرس للبنات...',
             'is_free' => false,
             'target_gender' => 'female',
         ]);
@@ -115,6 +119,53 @@ class DatabaseSeeder extends Seeder
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
+
+        // داتا فيك للاشتراكات
+        foreach (User::all() as $user) {
+            foreach (Course::all() as $course) {
+                Subscription::create([
+                    'user_id' => $user->id,
+                    'course_id' => $course->id,
+                    'payment_id' => null,
+                    'subscribed_at' => now()->subDays(rand(1, 30)),
+                    'is_active' => true,
+                    'is_approved' => true,
+                    'approved_at' => now()->subDays(rand(1, 30)),
+                    'admin_notes' => 'اشتراك تجريبي'
+                ]);
+            }
+        }
+        // داتا فيك للتقييمات
+        foreach (User::all() as $user) {
+            foreach (Course::all() as $course) {
+                Rating::create([
+                    'user_id' => $user->id,
+                    'course_id' => $course->id,
+                    'rating' => rand(1, 5),
+                    'review' => 'مراجعة تجريبية'
+                ]);
+            }
+        }
+        // داتا فيك للمفضلة
+        foreach (User::all() as $user) {
+            foreach (Course::all()->random(1) as $course) {
+                Favorite::create([
+                    'user_id' => $user->id,
+                    'course_id' => $course->id
+                ]);
+            }
+        }
+        // داتا فيك للتعليقات
+        foreach (User::all() as $user) {
+            foreach (Lesson::all()->random(1) as $lesson) {
+                Comment::create([
+                    'user_id' => $user->id,
+                    'lesson_id' => $lesson->id,
+                    'content' => 'تعليق تجريبي',
+                    'is_approved' => true
+                ]);
+            }
+        }
 
         $this->call([
             PaymentSeeder::class,

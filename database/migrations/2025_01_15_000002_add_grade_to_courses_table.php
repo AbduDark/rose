@@ -9,9 +9,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('courses', function (Blueprint $table) {
-            $table->enum('grade', ['الاول', 'الثاني', 'الثالث'])->default('الاول')->after('language');
-        });
+        if (!Schema::hasColumn('courses', 'grade')) {
+            Schema::table('courses', function (Blueprint $table) {
+                $table->enum('grade', ['الاول', 'الثاني', 'الثالث'])->default('الاول')->after('language');
+            });
+        }
     }
 
     public function down(): void

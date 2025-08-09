@@ -1,4 +1,3 @@
-
 <?php
 
 namespace App\Models;
@@ -22,6 +21,6 @@ class EmailVerification extends Model
 
     public function isExpired(): bool
     {
-        return $this->expires_at->isPast();
+    return $this->expires_at instanceof \Carbon\Carbon ? $this->expires_at->isPast() : false;
     }
 }
