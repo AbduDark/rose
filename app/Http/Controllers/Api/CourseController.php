@@ -105,6 +105,7 @@ class CourseController extends Controller
             'target_gender' => 'required|in:male,female,both',
             'duration_hours' => 'nullable|integer|min:0',
             'requirements' => 'nullable|string',
+            'grade' => 'required|in:الاول,الثاني,الثالث',
             'image' => 'nullable|image|max:2048',
         ]);
 
@@ -112,6 +113,15 @@ class CourseController extends Controller
 
         if ($request->hasFile('image')) {
             $data['image'] = $request->file('image')->store('courses', 'public');
+        } else {
+            // توليد صورة تلقائية
+            $imageGenerator = new \App\Services\CourseImageGenerator();
+            $data['image'] = $imageGenerator->generateCourseImage(
+                $request->title,
+                $request->price,
+                $request->description,
+                $request->grade
+            );
         }
 
         $course = Course::create($data);
@@ -130,6 +140,7 @@ class CourseController extends Controller
             'level' => 'sometimes|in:beginner,intermediate,advanced',
             'duration_hours' => 'nullable|integer|min:0',
             'requirements' => 'nullable|string',  
+            'grade' => 'sometimes|in:الاول,الثاني,الثالث',
             'image' => 'nullable|image|max:2048',
             'is_active' => 'sometimes|boolean',
         ]);

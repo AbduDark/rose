@@ -31,7 +31,7 @@ Route::prefix('auth')->middleware('throttle:10,1')->group(function () {
     Route::post('register',        [AuthController::class, 'register']);
     Route::post('login',           [AuthController::class, 'login']);
     Route::post('forgot-password', [AuthController::class, 'forgotPassword']);
-    Route::post('verify-email',    [AuthController::class, 'verifyEmail']);
+    Route::get('/verify-email',    [AuthController::class, 'verifyEmail']);
     Route::post('reset-password',  [AuthController::class, 'resetPassword']);
     Route::post('force-logout',    [AuthController::class, 'forceLogout']);
     Route::post('/resend-pin', [AuthController::class, 'resendPin']);

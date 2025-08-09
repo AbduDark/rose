@@ -20,6 +20,7 @@ class Course extends Model
         'requirements',
         'instructor_name',
         'language',
+        'grade',
     ];
 
     protected function casts(): array

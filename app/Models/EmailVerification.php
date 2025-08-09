@@ -1,3 +1,4 @@
+
 <?php
 
 namespace App\Models;
@@ -11,11 +12,16 @@ class EmailVerification extends Model
 
     protected $fillable = [
         'email',
-        'pin',
+        'token',
         'expires_at',
     ];
 
     protected $casts = [
         'expires_at' => 'datetime',
     ];
+
+    public function isExpired(): bool
+    {
+        return $this->expires_at->isPast();
+    }
 }

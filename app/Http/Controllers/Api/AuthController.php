@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use App\Models\EmailVerification;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\SendPinMail;
+use App\Mail\EmailVerificationMail; // Import the new Mail class
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 
@@ -50,19 +51,20 @@ class AuthController extends Controller
             'device_fingerprint' => $deviceFingerprint,
         ]);
 
-        // إرسال PIN للتحقق من البريد الإلكتروني
-        $pin = rand(100000, 999999);
-        EmailVerification::updateOrCreate(
-            ['email' => $user->email],
-            ['pin' => $pin, 'expires_at' => now()->addMinutes(5)]
-        );
+        // إرسال رابط التحقق من الإيميل
+        $token = \Str::random(60);
 
-        Mail::to($user->email)->send(new SendPinMail($pin));
+        EmailVerification::create([
+            'email' => $request->email,
+            'token' => $token,
+            'expires_at' => now()->addMinutes(60), // ساعة واحدة
+        ]);
 
-        $token = $user->createToken('auth_token')->plainTextToken;
-        
-        // Don't set active session until email is verified
-        // This prevents conflicts during first login
+        $verificationUrl = url("/api/auth/verify-email?token={$token}");
+        Mail::to($request->email)->send(new EmailVerificationMail($verificationUrl));
+
+        // The token is created here, but the user is not logged in until email is verified.
+        // This is handled by the `email_verified_at` check in the login method.
 
         Log::channel('security')->info('User registered', [
             'user_id' => $user->id,
@@ -74,7 +76,6 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => __('messages.auth.registered_successfully'),
-            'token'   => $token,
             'email_verification_required' => true
         ], 201);
     }
@@ -99,7 +100,7 @@ class AuthController extends Controller
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             RateLimiter::hit($key, 900);
-            
+
             Log::channel('security')->warning('Failed login attempt', [
                 'email' => $request->email,
                 'ip' => $request->ip(),
@@ -120,17 +121,17 @@ class AuthController extends Controller
 
         // Check if user is already logged in on another device
         $deviceFingerprint = $this->generateDeviceFingerprint($request);
-        
+
         // Only check for multiple devices if user has an active session AND a stored device fingerprint
         // This prevents issues for new users who just registered but haven't logged in before
-        if ($user->active_session_id && 
-            $user->device_fingerprint && 
+        if ($user->active_session_id &&
+            $user->device_fingerprint &&
             $user->device_fingerprint !== $deviceFingerprint &&
             $user->last_login_at) {
-            
+
             // Revoke all existing tokens
             $user->tokens()->delete();
-            
+
             Log::channel('security')->warning('Multiple device login attempt', [
                 'user_id' => $user->id,
                 'email' => $user->email,
@@ -145,7 +146,7 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
         $sessionId = Str::random(40);
-        
+
         $user->update([
             'active_session_id' => $sessionId,
             'device_fingerprint' => $deviceFingerprint,
@@ -181,7 +182,7 @@ class AuthController extends Controller
     public function logout(Request $request)
     {
         $user = $request->user();
-        
+
         Log::channel('security')->info('User logged out', [
             'user_id' => $user->id,
             'ip' => $request->ip(),
@@ -193,7 +194,7 @@ class AuthController extends Controller
         ]);
 
         $user->currentAccessToken()->delete();
-        
+
         return response()->json(['message' => __('messages.auth.logged_out_successfully')]);
     }
 
@@ -286,6 +287,9 @@ class AuthController extends Controller
     {
         $request->validate(['email' => 'required|email|exists:users,email']);
 
+        // For password reset, we still use PIN for now, as per original logic.
+        // The request to change this to a link for password reset was not explicit,
+        // but the email verification was changed to a link.
         $pin = rand(100000, 999999);
 
         EmailVerification::updateOrCreate(
@@ -305,43 +309,53 @@ class AuthController extends Controller
 
     public function verifyEmail(Request $request)
     {
-        $request->validate([
-            'email' => 'required|email',
-            'pin'   => 'required|string'
-        ]);
+        $token = $request->query('token');
 
-        $verification = EmailVerification::where('email', $request->email)
-            ->where('pin', $request->pin)
-            ->where('expires_at', '>', now())
-            ->first();
-
-        if (!$verification) {
-            return response()->json(['message' => __('messages.auth.invalid_or_expired_pin')], 422);
+        if (!$token) {
+            return response()->json([
+                'success' => false,
+                'message' => 'رابط التحقق غير صالح'
+            ], 400);
         }
 
-        $user = User::where('email', $request->email)->first();
-        $user->email_verified_at = now();
-        
-        // Clear any registration session data to ensure clean login
-        $user->active_session_id = null;
-        $user->device_fingerprint = null;
-        $user->save();
+        $verification = EmailVerification::where('token', $token)->first();
 
-        $verification->delete();
+        if (!$verification) {
+            return response()->json([
+                'success' => false,
+                'message' => 'رابط التحقق غير صالح'
+            ], 400);
+        }
 
-        Log::channel('security')->info('Email verified', [
-            'user_id' => $user->id,
-            'email' => $user->email,
-        ]);
+        if ($verification->isExpired()) { // Assuming isExpired() method exists in EmailVerification model
+            $verification->delete();
+            return response()->json([
+                'success' => false,
+                'message' => 'رابط التحقق منتهي الصلاحية'
+            ], 400);
+        }
 
-        return response()->json(['message' => __('messages.auth.email_verified_successfully')]);
+        // تفعيل المستخدم
+        $user = User::where('email', $verification->email)->first();
+        if ($user) {
+            $user->update(['email_verified_at' => now()]);
+            $verification->delete();
+
+            // إعادة توجيه إلى صفحة النجاح
+            return redirect('/email-verified?success=true');
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'المستخدم غير موجود'
+        ], 404);
     }
 
     public function resetPassword(Request $request)
     {
         $request->validate([
             'email'    => 'required|email|exists:users,email',
-            'pin'      => 'required|string',
+            'pin'      => 'required|string', // Still uses PIN for password reset
             'password' => 'required|min:8|confirmed|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/'
         ], [
             'password.regex' => 'Password must contain at least one uppercase letter, one lowercase letter, one number and one special character.'
@@ -358,7 +372,7 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
         $user->password = Hash::make($request->password);
-        
+
         // Force logout from all devices
         $user->tokens()->delete();
         $user->active_session_id = null;
@@ -381,7 +395,7 @@ class AuthController extends Controller
         $request->validate(['email' => 'required|email|exists:users,email']);
 
         $user = User::where('email', $request->email)->first();
-        
+
         if ($user->email_verified_at) {
             return response()->json(['message' => __('messages.auth.email_already_verified')], 422);
         }
@@ -396,22 +410,24 @@ class AuthController extends Controller
             ], 429);
         }
 
-        $pin = rand(100000, 999999);
+        // For resending verification link, we need to generate a new token.
+        $token = \Str::random(60);
         EmailVerification::updateOrCreate(
             ['email' => $request->email],
-            ['pin' => $pin, 'expires_at' => now()->addMinutes(5)]
+            ['token' => $token, 'expires_at' => now()->addMinutes(60)] // extend expiry
         );
 
-        Mail::to($request->email)->send(new SendPinMail($pin));
+        $verificationUrl = url("/api/auth/verify-email?token={$token}");
+        Mail::to($request->email)->send(new EmailVerificationMail($verificationUrl));
 
         RateLimiter::hit($key, 60);
 
-        Log::channel('security')->info('PIN resent', [
+        Log::channel('security')->info('Email verification link resent', [
             'email' => $request->email,
             'ip' => $request->ip(),
         ]);
 
-        return response()->json(['message' => __('messages.auth.verification_pin_sent')]);
+        return response()->json(['message' => 'Verification link has been resent. Please check your email.']);
     }
 
     private function generateDeviceFingerprint(Request $request)

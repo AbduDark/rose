@@ -22,6 +22,7 @@ return new class extends Migration
             $table->text('requirements')->nullable();
             $table->string('instructor_name')->nullable();
             $table->string('language', 10)->default('ar');
+            $table->enum('grade', ['الاول', 'الثاني', 'الثالث'])->default('الاول');
             $table->timestamps();
         });
     }
