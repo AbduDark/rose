@@ -1,11 +1,11 @@
 modules = ["php-8.2", "web"]
-run = "npm run dev"
+run = "php artisan serve"
 
 [nix]
 channel = "stable-25_05"
 
 [deployment]
-run = ["sh", "-c", "npm run dev"]
+run = ["sh", "-c", "php artisan serve"]
 
 [[ports]]
 localPort = 5173
