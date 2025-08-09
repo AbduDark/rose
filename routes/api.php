@@ -67,9 +67,13 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('comments',                    [CommentController::class, 'store']);
     Route::get('lessons/{lesson_id}/comments', [CommentController::class, 'index']);
 
-    // Ratings & Payments
+    // Ratings
     Route::post('ratings',                     [RatingController::class, 'store']);
-    Route::post('payments/vodafone',           [PaymentController::class, 'store']);
+    
+    // Payments
+    Route::get('courses/{courseId}/payment-form', [PaymentController::class, 'getPaymentForm']);
+    Route::post('payments/vodafone',           [PaymentController::class, 'submitVodafonePayment']);
+    Route::get('payments/history',             [PaymentController::class, 'getUserPaymentHistory']);
 });
 
 // Admin Routes
@@ -90,9 +94,10 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::put('admin/subscriptions/{id}/reject', [SubscriptionController::class, 'rejectSubscription']);
 
     // Payments Management
-    Route::get('admin/payments',           [PaymentController::class, 'adminIndex']);
-    Route::put('admin/payments/{id}/approve', [PaymentController::class, 'approve']);
-    Route::put('admin/payments/{id}/reject',  [PaymentController::class, 'reject']);
+    Route::get('admin/payments/pending',      [PaymentController::class, 'getPendingPayments']);
+    Route::get('admin/payments/stats',        [PaymentController::class, 'getPaymentStats']);
+    Route::put('admin/payments/{id}/approve', [PaymentController::class, 'approvePayment']);
+    Route::put('admin/payments/{id}/reject',  [PaymentController::class, 'rejectPayment']);
 
     // Comments Management
     Route::put('admin/comments/{id}/approve', [CommentController::class, 'approve']);

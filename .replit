@@ -17,7 +17,7 @@ localPort = 8000
 externalPort = 8000
 
 [workflows]
-runButton = "Laravel Complete Setup"
+runButton = "Laravel Development Setup"
 
 [[workflows.workflow]]
 name = "Laravel Development"
@@ -114,6 +114,39 @@ args = "php artisan serve --host=0.0.0.0 --port=8000"
 [[workflows.workflow]]
 name = "Laravel Complete Setup"
 author = 37158031
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan config:clear"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan route:clear"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan cache:clear"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan view:clear"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan key:generate --force"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan migrate:fresh --seed --force"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan serve --host=0.0.0.0 --port=8000"
+
+[[workflows.workflow]]
+name = "Laravel Development Setup"
+author = 46182483
 mode = "sequential"
 
 [[workflows.workflow.tasks]]

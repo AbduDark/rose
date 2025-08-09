@@ -12,8 +12,8 @@ class Subscription extends Model
     protected $fillable = [
         'user_id',
         'course_id',
-        'subscribed_at', 
-        'expires_at',
+        'payment_id',
+        'subscribed_at',
         'is_active',
         'is_approved',
         'approved_at',
@@ -39,5 +39,15 @@ class Subscription extends Model
     public function course()
     {
         return $this->belongsTo(Course::class);
+    }
+
+    public function ratings()
+    {
+        return $this->hasMany(Rating::class);
+    }
+
+    public function payment()
+    {
+        return $this->belongsTo(Payment::class);
     }
 }

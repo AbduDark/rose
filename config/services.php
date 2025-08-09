@@ -18,10 +18,6 @@ return [
         'token' => env('POSTMARK_TOKEN'),
     ],
 
-    'resend' => [
-        'key' => env('RESEND_KEY'),
-    ],
-
     'ses' => [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),
@@ -33,6 +29,13 @@ return [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
+    ],
+
+    'vodafone' => [
+        'merchant_id' => env('VODAFONE_MERCHANT_ID'),
+        'merchant_key' => env('VODAFONE_MERCHANT_KEY'),
+        'callback_url' => env('VODAFONE_CALLBACK_URL'),
+        'base_url' => env('VODAFONE_BASE_URL', 'https://api.vodafonecash.com.eg'),
     ],
 
 ];
