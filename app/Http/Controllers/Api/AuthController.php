@@ -1,0 +1,428 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
+use App\Models\User;
+use Illuminate\Support\Facades\Log;
+use App\Models\EmailVerification;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\SendPinMail;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
+
+class AuthController extends Controller
+{
+    public function register(Request $request)
+    {
+        $key = 'register:' . $request->ip();
+        if (RateLimiter::tooManyAttempts($key, 5)) {
+            return response()->json([
+                'message' => __('messages.general.error'),
+                'error' => 'Too many registration attempts. Try again later.'
+            ], 429);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|string|email|unique:users',
+            'password' => 'required|string|min:8|confirmed|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/',
+            'gender'   => 'required|in:male,female',
+        ], [
+            'password.regex' => 'Password must contain at least one uppercase letter, one lowercase letter, one number and one special character.'
+        ]);
+
+        if ($validator->fails()) {
+            RateLimiter::hit($key, 300);
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $deviceFingerprint = $this->generateDeviceFingerprint($request);
+
+        $user = User::create([
+            'name'     => $request->name,
+            'email'    => $request->email,
+            'password' => Hash::make($request->password),
+            'gender'   => $request->gender,
+            'device_fingerprint' => $deviceFingerprint,
+        ]);
+
+        // إرسال PIN للتحقق من البريد الإلكتروني
+        $pin = rand(100000, 999999);
+        EmailVerification::updateOrCreate(
+            ['email' => $user->email],
+            ['pin' => $pin, 'expires_at' => now()->addMinutes(5)]
+        );
+
+        Mail::to($user->email)->send(new SendPinMail($pin));
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+        
+        // Don't set active session until email is verified
+        // This prevents conflicts during first login
+
+        Log::channel('security')->info('User registered', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'ip' => $request->ip(),
+        ]);
+
+        RateLimiter::clear($key);
+
+        return response()->json([
+            'message' => __('messages.auth.registered_successfully'),
+            'token'   => $token,
+            'email_verification_required' => true
+        ], 201);
+    }
+
+    public function login(Request $request)
+    {
+        $key = 'login:' . $request->ip();
+        if (RateLimiter::tooManyAttempts($key, 10)) {
+            $seconds = RateLimiter::availableIn($key);
+            return response()->json([
+                'message' => __('messages.general.error'),
+                'error' => 'Too many login attempts. Try again in ' . $seconds . ' seconds.'
+            ], 429);
+        }
+
+        $request->validate([
+            'email'    => 'required|email',
+            'password' => 'required',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            RateLimiter::hit($key, 900);
+            
+            Log::channel('security')->warning('Failed login attempt', [
+                'email' => $request->email,
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ]);
+
+            return response()->json(['message' => __('messages.auth.invalid_credentials')], 401);
+        }
+
+        // التحقق من تأكيد البريد الإلكتروني
+        if (!$user->email_verified_at) {
+            return response()->json([
+                'message' => __('messages.auth.email_not_verified'),
+                'email_verification_required' => true,
+                'email' => $user->email
+            ], 403);
+        }
+
+        // Check if user is already logged in on another device
+        $deviceFingerprint = $this->generateDeviceFingerprint($request);
+        
+        // Only check for multiple devices if user has an active session AND a stored device fingerprint
+        // This prevents issues for new users who just registered but haven't logged in before
+        if ($user->active_session_id && 
+            $user->device_fingerprint && 
+            $user->device_fingerprint !== $deviceFingerprint &&
+            $user->last_login_at) {
+            
+            // Revoke all existing tokens
+            $user->tokens()->delete();
+            
+            Log::channel('security')->warning('Multiple device login attempt', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'ip' => $request->ip(),
+            ]);
+
+            return response()->json([
+                'message' => __('messages.auth.already_logged_in_another_device'),
+                'error' => 'You are already logged in on another device. Please logout from that device first.'
+            ], 403);
+        }
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+        $sessionId = Str::random(40);
+        
+        $user->update([
+            'active_session_id' => $sessionId,
+            'device_fingerprint' => $deviceFingerprint,
+            'last_login_at' => now(),
+        ]);
+
+        Log::channel('security')->info('User logged in', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'ip' => $request->ip(),
+        ]);
+
+        RateLimiter::clear($key);
+
+        return response()->json([
+            'token' => $token,
+            'session_id' => $sessionId,
+            'message' => __('messages.auth.login_done'),
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role ?? 'student',
+            ]
+        ]);
+    }
+
+    public function profile(Request $request)
+    {
+        return response()->json($request->user());
+    }
+
+    public function logout(Request $request)
+    {
+        $user = $request->user();
+        
+        Log::channel('security')->info('User logged out', [
+            'user_id' => $user->id,
+            'ip' => $request->ip(),
+        ]);
+
+        $user->update([
+            'active_session_id' => null,
+            'device_fingerprint' => null,
+        ]);
+
+        $user->currentAccessToken()->delete();
+        
+        return response()->json(['message' => __('messages.auth.logged_out_successfully')]);
+    }
+
+    public function forceLogout(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            return response()->json(['message' => __('messages.auth.invalid_credentials')], 401);
+        }
+
+        // Force logout from all devices
+        $user->tokens()->delete();
+        $user->update([
+            'active_session_id' => null,
+            'device_fingerprint' => null,
+        ]);
+
+        Log::channel('security')->info('Force logout performed', [
+            'user_id' => $user->id,
+            'ip' => $request->ip(),
+        ]);
+
+        return response()->json(['message' => 'Successfully logged out from all devices']);
+    }
+
+    public function changePassword(Request $request)
+    {
+        $request->validate([
+            'current_password' => 'required',
+            'new_password'     => 'required|min:8|confirmed|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/'
+        ], [
+            'new_password.regex' => 'Password must contain at least one uppercase letter, one lowercase letter, one number and one special character.'
+        ]);
+
+        $user = $request->user();
+
+        if (!Hash::check($request->current_password, $user->password)) {
+            Log::channel('security')->warning('Failed password change attempt', [
+                'user_id' => $user->id,
+                'ip' => $request->ip(),
+            ]);
+
+            return response()->json(['message' => __('messages.auth.current_password_incorrect')], 422);
+        }
+
+        $user->password = Hash::make($request->new_password);
+        $user->save();
+
+        // Force logout from all other sessions
+        $user->tokens()->where('id', '!=', $user->currentAccessToken()->id)->delete();
+
+        Log::channel('security')->info('Password changed', [
+            'user_id' => $user->id,
+            'ip' => $request->ip(),
+        ]);
+
+        return response()->json(['message' => __('messages.auth.password_changed_successfully')]);
+    }
+
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+
+        $request->validate([
+            'name' => 'nullable|string|max:255',
+            'image' => 'nullable|image|max:2048',
+        ]);
+
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('profiles', 'public');
+            $user->image = $path;
+        }
+
+        if ($request->filled('name')) {
+            $user->name = $request->name;
+        }
+
+        $user->save();
+
+        return response()->json(['message' => __('messages.auth.profile_updated_successfully'), 'user' => $user]);
+    }
+
+    public function forgotPassword(Request $request)
+    {
+        $request->validate(['email' => 'required|email|exists:users,email']);
+
+        $pin = rand(100000, 999999);
+
+        EmailVerification::updateOrCreate(
+            ['email' => $request->email],
+            ['pin' => $pin, 'expires_at' => now()->addMinutes(5)]
+        );
+
+        Mail::to($request->email)->send(new SendPinMail($pin));
+
+        Log::channel('security')->info('Password reset requested', [
+            'email' => $request->email,
+            'ip' => $request->ip(),
+        ]);
+
+        return response()->json(['message' => __('messages.auth.verification_pin_sent')]);
+    }
+
+    public function verifyEmail(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'pin'   => 'required|string'
+        ]);
+
+        $verification = EmailVerification::where('email', $request->email)
+            ->where('pin', $request->pin)
+            ->where('expires_at', '>', now())
+            ->first();
+
+        if (!$verification) {
+            return response()->json(['message' => __('messages.auth.invalid_or_expired_pin')], 422);
+        }
+
+        $user = User::where('email', $request->email)->first();
+        $user->email_verified_at = now();
+        
+        // Clear any registration session data to ensure clean login
+        $user->active_session_id = null;
+        $user->device_fingerprint = null;
+        $user->save();
+
+        $verification->delete();
+
+        Log::channel('security')->info('Email verified', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+        ]);
+
+        return response()->json(['message' => __('messages.auth.email_verified_successfully')]);
+    }
+
+    public function resetPassword(Request $request)
+    {
+        $request->validate([
+            'email'    => 'required|email|exists:users,email',
+            'pin'      => 'required|string',
+            'password' => 'required|min:8|confirmed|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/'
+        ], [
+            'password.regex' => 'Password must contain at least one uppercase letter, one lowercase letter, one number and one special character.'
+        ]);
+
+        $verification = EmailVerification::where('email', $request->email)
+            ->where('pin', $request->pin)
+            ->where('expires_at', '>', now())
+            ->first();
+
+        if (!$verification) {
+            return response()->json(['message' => __('messages.auth.invalid_or_expired_pin')], 422);
+        }
+
+        $user = User::where('email', $request->email)->first();
+        $user->password = Hash::make($request->password);
+        
+        // Force logout from all devices
+        $user->tokens()->delete();
+        $user->active_session_id = null;
+        $user->device_fingerprint = null;
+        $user->save();
+
+        $verification->delete();
+
+        Log::channel('security')->info('Password reset completed', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'ip' => $request->ip(),
+        ]);
+
+        return response()->json(['message' => __('messages.auth.password_reset_successfully')]);
+    }
+
+    public function resendPin(Request $request)
+    {
+        $request->validate(['email' => 'required|email|exists:users,email']);
+
+        $user = User::where('email', $request->email)->first();
+        
+        if ($user->email_verified_at) {
+            return response()->json(['message' => __('messages.auth.email_already_verified')], 422);
+        }
+
+        // التحقق من Rate Limiting
+        $key = 'resend_pin:' . $request->email;
+        if (RateLimiter::tooManyAttempts($key, 3)) {
+            $seconds = RateLimiter::availableIn($key);
+            return response()->json([
+                'message' => __('messages.general.error'),
+                'error' => 'Too many attempts. Try again in ' . $seconds . ' seconds.'
+            ], 429);
+        }
+
+        $pin = rand(100000, 999999);
+        EmailVerification::updateOrCreate(
+            ['email' => $request->email],
+            ['pin' => $pin, 'expires_at' => now()->addMinutes(5)]
+        );
+
+        Mail::to($request->email)->send(new SendPinMail($pin));
+
+        RateLimiter::hit($key, 60);
+
+        Log::channel('security')->info('PIN resent', [
+            'email' => $request->email,
+            'ip' => $request->ip(),
+        ]);
+
+        return response()->json(['message' => __('messages.auth.verification_pin_sent')]);
+    }
+
+    private function generateDeviceFingerprint(Request $request)
+    {
+        $data = [
+            'user_agent' => $request->userAgent(),
+            'ip' => $request->ip(),
+            'accept_language' => $request->header('Accept-Language'),
+            'accept_encoding' => $request->header('Accept-Encoding'),
+        ];
+
+        return hash('sha256', json_encode($data));
+    }
+}

@@ -1,0 +1,145 @@
+modules = ["php-8.2", "web"]
+run = "npm run dev"
+
+[nix]
+channel = "stable-25_05"
+
+[deployment]
+run = ["sh", "-c", "npm run dev"]
+
+[[ports]]
+localPort = 5173
+externalPort = 80
+exposeLocalhost = true
+
+[[ports]]
+localPort = 8000
+externalPort = 8000
+
+[workflows]
+runButton = "Laravel Complete Setup"
+
+[[workflows.workflow]]
+name = "Laravel Development"
+author = 45724641
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan migrate --graceful"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan db:seed"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan serve --host=0.0.0.0 --port=8000"
+
+[[workflows.workflow]]
+name = "Laravel App"
+author = 45724641
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan key:generate --force"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan migrate:fresh --seed --force"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan serve --host=0.0.0.0 --port=8000"
+
+[[workflows.workflow]]
+name = "Laravel Fixed"
+author = 45724641
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan config:clear"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan route:clear"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan cache:clear"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan key:generate --force"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan migrate:fresh --seed --force"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan serve --host=0.0.0.0 --port=8000"
+
+[[workflows.workflow]]
+name = "Laravel Setup"
+author = 37158031
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan config:clear"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan route:clear"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan cache:clear"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan key:generate --force"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan migrate:fresh --seed --force"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan serve --host=0.0.0.0 --port=8000"
+
+[[workflows.workflow]]
+name = "Laravel Complete Setup"
+author = 37158031
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan config:clear"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan route:clear"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan cache:clear"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan view:clear"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan key:generate --force"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan migrate:fresh --seed --force"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "php artisan serve --host=0.0.0.0 --port=8000"

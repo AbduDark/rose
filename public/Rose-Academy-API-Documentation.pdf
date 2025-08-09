@@ -1,0 +1,10 @@
+
+# هذا ملف نصي مؤقت - يمكنك تحويل ملف Markdown إلى PDF باستخدام أدوات مثل:
+# - pandoc
+# - wkhtmltopdf  
+# - أو أي أداة تحويل أخرى
+
+# للتحويل إلى PDF:
+# pandoc Rose-Academy-API-Documentation.md -o Rose-Academy-API-Documentation.pdf --pdf-engine=wkhtmltopdf
+
+# أو استخدام أدوات أونلاين لتحويل Markdown إلى PDF

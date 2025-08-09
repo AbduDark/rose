@@ -1,0 +1,35 @@
+<?php
+
+use Illuminate\Support\Facades\Route;
+
+Route::get('/', function () {
+    // Check if API is working
+    try {
+        $response = [
+            'app' => 'Rose Academy',
+            'status' => 'running',
+            'api_url' => url('/api'),
+            'docs_url' => url('/docs'),
+            'timestamp' => now()
+        ];
+        return response()->json($response);
+    } catch (Exception $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+});
+
+Route::get('/docs', function () {
+    return view('documentation');
+})->name('api.docs');
+
+Route::get('/api-docs', function () {
+    return view('documentation');
+});
+
+Route::get('/roadmap', function () {
+    return response()->file(public_path('roadmap.html'));
+});
+
+Route::get('/verify-email', function () {
+    return response()->file(public_path('verify-email.html'));
+});
