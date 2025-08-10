@@ -26,6 +26,9 @@ class LocalizationMiddleware
         
         App::setLocale($locale);
         
+        // Store locale in request for easy access
+        $request->attributes->set('locale', $locale);
+        
         return $next($request);
     }
 }

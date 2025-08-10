@@ -11,13 +11,16 @@ trait ApiResponseTrait
 {
     protected function successResponse($data = null, $message = null, $statusCode = 200): JsonResponse
     {
+        $locale = request()->attributes->get('locale', 'ar');
+        
+        if (is_string($message)) {
+            $message = ['ar' => $message, 'en' => $message];
+        }
+        
         $response = [
             'success' => true,
             'status_code' => $statusCode,
-            'message' => [
-                'ar' => $message['ar'] ?? 'تم بنجاح',
-                'en' => $message['en'] ?? 'Success'
-            ]
+            'message' => $message[$locale] ?? ($locale === 'ar' ? 'تم بنجاح' : 'Success')
         ];
 
         if ($data !== null) {
@@ -29,13 +32,18 @@ trait ApiResponseTrait
 
     protected function errorResponse($message = null, $statusCode = 400, $errors = null): JsonResponse
     {
+        $locale = request()->attributes->get('locale', 'ar');
+        
+        if (is_string($message)) {
+            $message = ['ar' => $message, 'en' => $message];
+        }
+        
+        $defaultMessage = $this->getDefaultErrorMessage($statusCode);
+        
         $response = [
             'success' => false,
             'status_code' => $statusCode,
-            'message' => [
-                'ar' => $message['ar'] ?? $this->getDefaultErrorMessage($statusCode)['ar'],
-                'en' => $message['en'] ?? $this->getDefaultErrorMessage($statusCode)['en']
-            ]
+            'message' => $message[$locale] ?? $defaultMessage[$locale]
         ];
 
         if ($errors !== null) {

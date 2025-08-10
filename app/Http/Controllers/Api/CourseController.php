@@ -15,86 +15,113 @@ class CourseController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = Course::query()->where('is_active', true);
+            // Create cache key based on request parameters
+            $cacheKey = 'courses_' . md5(serialize($request->all()));
+            
+            // Cache for 30 minutes
+            $courses = \Cache::remember($cacheKey, 1800, function () use ($request) {
+                $query = Course::query()->where('is_active', true);
 
-            // Search functionality
-            if ($request->has('search')) {
-                $search = $request->get('search');
-                $query->where(function($q) use ($search) {
-                    $q->where('title', 'like', "%{$search}%")
-                      ->orWhere('description', 'like', "%{$search}%")
-                      ->orWhere('instructor_name', 'like', "%{$search}%");
-                });
-            }
+                // Search functionality
+                if ($request->has('search')) {
+                    $search = $request->get('search');
+                    $query->where(function($q) use ($search) {
+                        $q->where('title', 'like', "%{$search}%")
+                          ->orWhere('description', 'like', "%{$search}%")
+                          ->orWhere('instructor_name', 'like', "%{$search}%");
+                    });
+                }
 
-            // Filter by level
-            if ($request->has('level')) {
-                $query->where('level', $request->get('level'));
-            }
+                // Filter by level
+                if ($request->has('level')) {
+                    $query->where('level', $request->get('level'));
+                }
 
-            // Filter by language
-            if ($request->has('language')) {
-                $query->where('language', $request->get('language'));
-            }
+                // Filter by language
+                if ($request->has('language')) {
+                    $query->where('language', $request->get('language'));
+                }
 
-            // Filter by price range
-            if ($request->has('min_price')) {
-                $query->where('price', '>=', $request->get('min_price'));
-            }
-            if ($request->has('max_price')) {
-                $query->where('price', '<=', $request->get('max_price'));
-            }
+                // Filter by price range
+                if ($request->has('min_price')) {
+                    $query->where('price', '>=', $request->get('min_price'));
+                }
+                if ($request->has('max_price')) {
+                    $query->where('price', '<=', $request->get('max_price'));
+                }
 
-            // Sort options
-            $sortBy = $request->get('sort_by', 'created_at');
-            $sortOrder = $request->get('sort_order', 'desc');
+                // Sort options
+                $sortBy = $request->get('sort_by', 'created_at');
+                $sortOrder = $request->get('sort_order', 'desc');
 
-            if (in_array($sortBy, ['title', 'price', 'created_at', 'duration_hours'])) {
-                $query->orderBy($sortBy, $sortOrder);
-            }
+                if (in_array($sortBy, ['title', 'price', 'created_at', 'duration_hours'])) {
+                    $query->orderBy($sortBy, $sortOrder);
+                }
 
-            $courses = $query->with(['ratings'])
+                return $query->with(['ratings'])
                            ->withCount('lessons')
                            ->paginate($request->get('per_page', 10));
+            });
 
-            return response()->json([
-                'success' => true,
-                'data' => CourseResource::collection($courses),
-                'message' => __('messages.courses_retrieved')
+            return $this->successResponse(CourseResource::collection($courses), [
+                'ar' => 'تم جلب الكورسات بنجاح',
+                'en' => 'Courses retrieved successfully'
             ]);
 
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => __('messages.server_error'),
-                'error' => config('app.debug') ? $e->getMessage() : null
-            ], 500);
+            \Log::error('Courses index error: ' . $e->getMessage());
+            return $this->serverErrorResponse();
         }
     }
 
     public function show($id, Request $request)
     {
-        $course = Course::with(['lessons', 'ratings.user'])->findOrFail($id);
+        try {
+            $course = Course::with(['lessons', 'ratings.user'])->findOrFail($id);
 
-        // Check gender access
-        if ($request->user()) {
-            $userGender = $request->user()->gender;
-            if ($course->target_gender !== 'both' && $course->target_gender !== $userGender) {
-                return response()->json(['message' => 'Access denied'], 403);
+            // Check if course is active
+            if (!$course->is_active) {
+                return $this->errorResponse([
+                    'ar' => 'هذا الكورس غير متاح حالياً',
+                    'en' => 'This course is not available'
+                ], 404);
             }
-        } elseif ($course->target_gender !== 'both') {
-            return response()->json(['message' => 'Login required'], 401);
+
+            // Check gender access
+            if ($request->user()) {
+                $userGender = $request->user()->gender;
+                if ($course->target_gender !== 'both' && $course->target_gender !== $userGender) {
+                    return $this->errorResponse([
+                        'ar' => 'هذا الكورس غير متاح لجنسك',
+                        'en' => 'This course is not available for your gender'
+                    ], 403);
+                }
+            } elseif ($course->target_gender !== 'both') {
+                return $this->errorResponse([
+                    'ar' => 'يجب تسجيل الدخول لعرض هذا الكورس',
+                    'en' => 'Login required to view this course'
+                ], 401);
+            }
+
+            $course->average_rating = $course->averageRating();
+            $course->total_ratings = $course->totalRatings();
+
+            if ($request->user()) {
+                $course->is_subscribed = $request->user()->isSubscribedTo($id);
+                $course->is_favorited = $request->user()->hasFavorited($id);
+            }
+
+            return $this->successResponse(new CourseResource($course), [
+                'ar' => 'تم جلب بيانات الكورس بنجاح',
+                'en' => 'Course retrieved successfully'
+            ]);
+
+        } catch (ModelNotFoundException $e) {
+            return $this->notFoundResponse('Course');
+        } catch (\Exception $e) {
+            \Log::error('Course show error: ' . $e->getMessage());
+            return $this->serverErrorResponse();
         }
-
-        $course->average_rating = $course->averageRating();
-        $course->total_ratings = $course->totalRatings();
-
-        if ($request->user()) {
-            $course->is_subscribed = $request->user()->isSubscribedTo($id);
-            $course->is_favorited = $request->user()->hasFavorited($id);
-        }
-
-        return response()->json($course);
     }
 
     public function store(Request $request)

@@ -69,7 +69,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     // Ratings
     Route::post('ratings',                     [RatingController::class, 'store']);
-    
+
     // Payments
     Route::get('courses/{courseId}/payment-form', [PaymentController::class, 'getPaymentForm']);
     Route::post('payments/vodafone',           [PaymentController::class, 'submitVodafonePayment']);

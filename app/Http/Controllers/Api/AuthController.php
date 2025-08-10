@@ -186,50 +186,33 @@ class AuthController extends Controller
             $user = $request->user();
 
             if (!$user) {
-                return response()->json([
-                    'message' => 'User not authenticated'
+                return $this->errorResponse([
+                    'ar' => 'لم يتم العثور على المستخدم',
+                    'en' => 'User not found'
                 ], 401);
             }
 
-            // تسجيل محاولة تسجيل الخروج
-            Log::channel('security')->info('User logout attempt', [
-                'user_id' => $user->id,
-                'ip' => $request->ip(),
-                'user_agent' => $request->userAgent()
-            ]);
+            // Revoke current access token
+            $user->currentAccessToken()->delete();
 
-            // حذف التوكن الحالي
-            if ($request->bearerToken()) {
-                $user->tokens()->where('id', $user->currentAccessToken()->id)->delete();
+            // Optional: Revoke all tokens
+            if ($request->has('logout_all_devices') && $request->logout_all_devices) {
+                $user->tokens()->delete();
             }
 
-            // تحديث بيانات الجلسة
-            $user->update([
-                'active_session_id' => null,
-                'device_fingerprint' => null,
-                'last_logout_at' => now()
+            // Clear session if exists
+            if ($user->session_id) {
+                $user->update(['session_id' => null]);
+            }
+
+            return $this->successResponse(null, [
+                'ar' => 'تم تسجيل الخروج بنجاح',
+                'en' => 'Logged out successfully'
             ]);
 
-            Log::channel('security')->info('User logged out successfully', [
-                'user_id' => $user->id,
-                'ip' => $request->ip()
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => __('messages.auth.logged_out_successfully')
-            ]);
         } catch (\Exception $e) {
-            Log::channel('security')->error('Error during logout', [
-                'error' => $e->getMessage(),
-                'user_id' => $user->id ?? null,
-                'ip' => $request->ip()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'حدث خطأ أثناء تسجيل الخروج'
-            ], 500);
+            \Log::error('Logout error: ' . $e->getMessage());
+            return $this->serverErrorResponse();
         }
     }
 
@@ -263,36 +246,41 @@ class AuthController extends Controller
 
     public function changePassword(Request $request)
     {
-        $request->validate([
-            'current_password' => 'required',
-            'new_password'     => 'required|min:8|confirmed|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/'
-        ], [
-            'new_password.regex' => 'Password must contain at least one uppercase letter, one lowercase letter, one number and one special character.'
-        ]);
-
-        $user = $request->user();
-
-        if (!Hash::check($request->current_password, $user->password)) {
-            Log::channel('security')->warning('Failed password change attempt', [
-                'user_id' => $user->id,
-                'ip' => $request->ip(),
+        try {
+            $request->validate([
+                'current_password' => 'required|string',
+                'new_password' => [
+                    'required',
+                    'string',
+                    'min:8',
+                    'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/',
+                    'confirmed'
+                ]
             ]);
 
-            return response()->json(['message' => __('messages.auth.current_password_incorrect')], 422);
+            $user = $request->user();
+
+            if (!Hash::check($request->current_password, $user->password)) {
+                return $this->errorResponse([
+                    'ar' => 'كلمة المرور الحالية غير صحيحة',
+                    'en' => 'Current password is incorrect'
+                ], 422);
+            }
+
+            $user->update([
+                'password' => Hash::make($request->new_password)
+            ]);
+
+            return $this->successResponse(null, [
+                'ar' => 'تم تغيير كلمة المرور بنجاح',
+                'en' => 'Password changed successfully'
+            ]);
+
+        } catch (ValidationException $e) {
+            return $this->validationErrorResponse($e);
+        } catch (\Exception $e) {
+            return $this->serverErrorResponse();
         }
-
-        $user->password = Hash::make($request->new_password);
-        $user->save();
-
-        // Force logout from all other sessions
-        $user->tokens()->where('id', '!=', $user->currentAccessToken()->id)->delete();
-
-        Log::channel('security')->info('Password changed', [
-            'user_id' => $user->id,
-            'ip' => $request->ip(),
-        ]);
-
-        return response()->json(['message' => __('messages.auth.password_changed_successfully')]);
     }
 
     public function updateProfile(Request $request)
@@ -560,5 +548,20 @@ class AuthController extends Controller
                 'en' => $message,
             ],
         ], 500);
+    }
+
+    /**
+     * Return a generic error response with custom messages.
+     *
+     * @param  array  $messages
+     * @param  int    $status
+     * @return \Illuminate\Http\JsonResponse
+     */
+    protected function errorResponse(array $messages, int $status = 400)
+    {
+        return response()->json([
+            'success' => false,
+            'message' => $messages,
+        ], $status);
     }
 }
