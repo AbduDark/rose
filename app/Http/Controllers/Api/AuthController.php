@@ -23,7 +23,6 @@ class AuthController extends Controller
 {
     public function register(Request $request)
     {
-        $something = null; // Placeholder for any additional data if needed
         try {
             $validator = Validator::make($request->all(), [
                 'name' => 'required|string|max:255',
@@ -53,6 +52,7 @@ class AuthController extends Controller
             }
 
             $pin = rand(100000, 999999);
+            $token = Str::random(60);
 
             $user = User::create([
                 'name' => $request->name,
@@ -62,18 +62,31 @@ class AuthController extends Controller
                 'gender' => $request->gender,
                 'pin' => $pin,
                 'pin_expires_at' => Carbon::now()->addMinutes(10),
-                'email_verified_at' => null
+                'email_verified_at' => null,
+                'role' => 'student'
+            ]);
+
+            // Create email verification record
+            EmailVerification::create([
+                'email' => $user->email,
+                'token' => $token,
+                'expires_at' => Carbon::now()->addHours(24)
             ]);
 
             // Send verification email
             try {
-                Mail::to($user->email)->send(new SendPinMail($user));
+                $verificationUrl = url("/api/auth/verify-email?token={$token}");
+                Mail::to($user->email)->send(new EmailVerificationMail($verificationUrl));
             } catch (\Exception $e) {
                 Log::error('Email sending failed: ' . $e->getMessage());
+                return $this->errorResponse([
+                    'ar' => 'حدث خطأ في إرسال بريد التحقق. يرجى المحاولة لاحقاً.',
+                    'en' => 'Failed to send verification email. Please try again later.'
+                ], 500);
             }
 
             return $this->successResponse([
-                'user' => $user->only(['id', 'name', 'email', 'phone', 'gender']),
+                'user' => $user->only(['id', 'name', 'email', 'phone', 'gender', 'role']),
                 'email_verification_required' => true
             ], [
                 'ar' => 'تم تسجيل المستخدم بنجاح. يرجى التحقق من بريدك الإلكتروني للتحقق.',
@@ -236,10 +249,10 @@ class AuthController extends Controller
 
             // Clear session if exists
             if ($user->active_session_id) {
-                $user->update(['session_id' => null]);
+                $user->update(['active_session_id' => null]);
             }
 
-            return $this->successResponse($something ?? [
+            return $this->successResponse([], [
                 'ar' => 'تم تسجيل الخروج بنجاح',
                 'en' => 'Logged out successfully'
             ]);
@@ -305,7 +318,7 @@ class AuthController extends Controller
                 'password' => Hash::make($request->new_password)
             ]);
 
-            return $this->successResponse($something ?? [
+            return $this->successResponse([], [
                 'ar' => 'تم تغيير كلمة المرور بنجاح',
                 'en' => 'Password changed successfully'
             ]);
@@ -362,11 +375,11 @@ class AuthController extends Controller
 
             $user->save();
 
-            // إعادة تحميل البيانات من قاعدة البيانات للتأكد من الحصول على أحدث البيانات
+            // إعادة تحميل البيانات من قاعدة البيانات
             $user->refresh();
 
             // إضافة URL كامل للصورة
-            $userData = $user->only(['id', 'name', 'email', 'phone', 'gender', 'image']);
+            $userData = $user->only(['id', 'name', 'email', 'phone', 'gender', 'image', 'role']);
             if ($user->image) {
                 $userData['image_url'] = url('storage/' . $user->image);
             }
@@ -388,34 +401,34 @@ class AuthController extends Controller
     {
         $request->validate(['email' => 'required|email|exists:users,email']);
 
-        // For password reset, we still use PIN for now, as per original logic.
-        // The request to change this to a link for password reset was not explicit,
-        // but the email verification was changed to a link.
-        $pin = rand(100000, 999999);
+        $token = Str::random(60);
 
         EmailVerification::updateOrCreate(
             ['email' => $request->email],
-            ['pin' => $pin, 'expires_at' => now()->addMinutes(5)]
+            ['token' => $token, 'expires_at' => now()->addMinutes(60)]
         );
 
-        Mail::to($request->email)->send(new SendPinMail($pin));
+        $resetUrl = url("/api/auth/reset-password?token={$token}");
+        Mail::to($request->email)->send(new EmailVerificationMail($resetUrl));
 
         Log::channel('security')->info('Password reset requested', [
             'email' => $request->email,
             'ip' => $request->ip(),
         ]);
 
-        return response()->json(['message' => __('messages.auth.verification_pin_sent')]);
+        return response()->json(['message' => 'Password reset link has been sent to your email']);
     }
 
     private function generateDeviceFingerprint(Request $request)
     {
-        return hash('sha256', 
-            $request->userAgent() . 
-            $request->ip() . 
-            $request->header('Accept-Language', '') .
-            $request->header('Accept-Encoding', '')
-        );
+        $data = [
+            'user_agent' => $request->userAgent(),
+            'ip' => $request->ip(),
+            'accept_language' => $request->header('Accept-Language'),
+            'accept_encoding' => $request->header('Accept-Encoding'),
+        ];
+
+        return hash('sha256', json_encode($data));
     }
 
     public function verifyEmail(Request $request)
@@ -483,23 +496,21 @@ class AuthController extends Controller
     public function resetPassword(Request $request)
     {
         $request->validate([
-            'email'    => 'required|email|exists:users,email',
-            'pin'      => 'required|string', // Still uses PIN for password reset
+            'token' => 'required|string',
             'password' => 'required|min:8|confirmed|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/'
         ], [
             'password.regex' => 'Password must contain at least one uppercase letter, one lowercase letter, one number and one special character.'
         ]);
 
-        $verification = EmailVerification::where('email', $request->email)
-            ->where('pin', $request->pin)
+        $verification = EmailVerification::where('token', $request->token)
             ->where('expires_at', '>', now())
             ->first();
 
         if (!$verification) {
-            return response()->json(['message' => __('messages.auth.invalid_or_expired_pin')], 422);
+            return response()->json(['message' => 'Invalid or expired token'], 422);
         }
 
-        $user = User::where('email', $request->email)->first();
+        $user = User::where('email', $verification->email)->first();
         $user->password = Hash::make($request->password);
 
         // Force logout from all devices
@@ -516,34 +527,32 @@ class AuthController extends Controller
             'ip' => $request->ip(),
         ]);
 
-        return response()->json(['message' => __('messages.auth.password_reset_successfully')]);
+        return response()->json(['message' => 'Password has been reset successfully']);
     }
 
-    public function resendPin(Request $request)
+    public function resendVerification(Request $request)
     {
         $request->validate(['email' => 'required|email|exists:users,email']);
 
         $user = User::where('email', $request->email)->first();
 
         if ($user->email_verified_at) {
-            return response()->json(['message' => __('messages.auth.email_already_verified')], 422);
+            return response()->json(['message' => 'Email already verified'], 422);
         }
 
         // التحقق من Rate Limiting
-        $key = 'resend_pin:' . $request->email;
+        $key = 'resend_verification:' . $request->email;
         if (RateLimiter::tooManyAttempts($key, 3)) {
             $seconds = RateLimiter::availableIn($key);
             return response()->json([
-                'message' => __('messages.general.error'),
-                'error' => 'Too many attempts. Try again in ' . $seconds . ' seconds.'
+                'message' => 'Too many attempts. Try again in ' . $seconds . ' seconds.'
             ], 429);
         }
 
-        // For resending verification link, we need to generate a new token.
         $token = Str::random(60);
         EmailVerification::updateOrCreate(
             ['email' => $request->email],
-            ['token' => $token, 'expires_at' => now()->addMinutes(60)] // extend expiry
+            ['token' => $token, 'expires_at' => now()->addMinutes(60)]
         );
 
         $verificationUrl = url("/api/auth/verify-email?token={$token}");
@@ -559,24 +568,6 @@ class AuthController extends Controller
         return response()->json(['message' => 'Verification link has been resent. Please check your email.']);
     }
 
-    private function generateDeviceFingerprint(Request $request)
-    {
-        $data = [
-            'user_agent' => $request->userAgent(),
-            'ip' => $request->ip(),
-            'accept_language' => $request->header('Accept-Language'),
-            'accept_encoding' => $request->header('Accept-Encoding'),
-        ];
-
-        return hash('sha256', json_encode($data));
-    }
-
-    /**
-     * Return a validation error response.
-     *
-     * @param  \Illuminate\Validation\ValidationException  $exception
-     * @return \Illuminate\Http\JsonResponse
-     */
     protected function validationErrorResponse(ValidationException $exception)
     {
         $errors = $exception->errors();
@@ -584,10 +575,9 @@ class AuthController extends Controller
         $formattedErrors = [];
         foreach ($errors as $field => $messages) {
             $formattedErrors[$field] = [
-                'ar' => $messages[0] ?? 'خطأ في التحقق', // Arabic message
-                'en' => $messages[0] ?? 'Validation error', // English message
+                'ar' => $messages[0] ?? 'خطأ في التحقق',
+                'en' => $messages[0] ?? 'Validation error',
             ];
-            // If there are multiple messages for a field, you might want to handle that differently
             if (count($messages) > 1) {
                 $formattedErrors[$field]['en'] .= ' (and ' . (count($messages) - 1) . ' more)';
                 $formattedErrors[$field]['ar'] .= ' (و ' . (count($messages) - 1) . ' المزيد)';
@@ -604,14 +594,6 @@ class AuthController extends Controller
         ], 422);
     }
 
-    /**
-     * Return a generic success response.
-     *
-     * @param  array  $data
-     * @param  array  $messages
-     * @param  int    $status
-     * @return \Illuminate\Http\JsonResponse
-     */
     protected function successResponse(array $data = [], array $messages = ['en' => 'Success'], int $status = 200)
     {
         return response()->json([
@@ -621,12 +603,6 @@ class AuthController extends Controller
         ], $status);
     }
 
-    /**
-     * Return a generic server error response.
-     *
-     * @param  string $message
-     * @return \Illuminate\Http\JsonResponse
-     */
     protected function serverErrorResponse(string $message = 'An unexpected error occurred on the server.')
     {
         return response()->json([
@@ -638,18 +614,12 @@ class AuthController extends Controller
         ], 500);
     }
 
-    /**
-     * Return a generic error response with custom messages.
-     *
-     * @param  array  $messages
-     * @param  int    $status
-     * @return \Illuminate\Http\JsonResponse
-     */
-    protected function errorResponse(array $messages, int $status = 400)
+    protected function errorResponse(array $messages, int $status = 400, array $data = [])
     {
         return response()->json([
             'success' => false,
             'message' => $messages,
+            'data' => $data
         ], $status);
     }
 }
