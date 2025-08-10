@@ -1,81 +1,76 @@
 <?php
 
 namespace App\Http\Controllers\Api;
-
+use Illuminate\Routing\Controller as BaseController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\{Storage, Cache, Log, Validator, Auth};
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Validation\ValidationException;
 use App\Http\Controllers\Controller;
 use App\Traits\ApiResponseTrait;
-use App\Models\Course;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use App\Models\{Course, Subscription, User};
 use App\Http\Resources\CourseResource;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Support\Facades\Log;
-use App\Services\CourseImageGenerator; // Assuming this service exists for image generation
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
-use App\Models\Subscription; // Import Subscription model
-class CourseController extends Controller
+use App\Services\{CourseImageGenerator, ImageOptimizer};
+
+class CourseController extends Basecontroller
 {
     use ApiResponseTrait;
+
+    public function __construct()
+    {
+        $this->middleware('auth:sanctum')->except(['index', 'show']);
+        $this->middleware('can:create,course')->only('store');
+        $this->middleware('can:update,course')->only('update');
+        $this->middleware('can:delete,course')->only('destroy');
+    }
+
     public function index(Request $request)
     {
         try {
-            // Create cache key based on request parameters
             $cacheKey = 'courses_' . md5(serialize($request->all()));
 
-            // Cache for 30 minutes
-            $courses = Cache::remember($cacheKey, 1800, function () use ($request) {
-                $query = Course::query()->where('is_active', true);
+            $courses = Cache::remember($cacheKey, now()->addMinutes(30), function () use ($request) {
+                $query = Course::active()
+                    ->with(['ratings'])
+                    ->withCount('lessons');
 
-                // Search functionality
+                // Search
                 if ($request->has('search')) {
-                    $search = $request->get('search');
-                    $query->where(function($q) use ($search) {
-                        $q->where('title', 'like', "%{$search}%")
-                          ->orWhere('description', 'like', "%{$search}%")
-                          ->orWhere('instructor_name', 'like', "%{$search}%");
+                    $query->where(function($q) use ($request) {
+                        $q->where('title', 'like', "%{$request->search}%")
+                          ->orWhere('description', 'like', "%{$request->search}%")
+                          ->orWhere('instructor_name', 'like', "%{$request->search}%");
                     });
                 }
 
-                // Filter by level
-                if ($request->has('level')) {
-                    $query->where('level', $request->get('level'));
-                }
+                // Filters
+                $query->when($request->level, fn($q, $level) => $q->where('level', $level))
+                     ->when($request->language, fn($q, $lang) => $q->where('language', $lang))
+                     ->when($request->grade, fn($q, $grade) => $q->where('grade', $grade))
+                     ->when($request->min_price, fn($q, $min) => $q->where('price', '>=', $min))
+                     ->when($request->max_price, fn($q, $max) => $q->where('price', '<=', $max));
 
-                // Filter by language
-                if ($request->has('language')) {
-                    $query->where('language', $request->get('language'));
-                }
+                // Sorting
+                $sortBy = in_array($request->sort_by, ['title', 'price', 'created_at', 'duration_hours']) 
+                    ? $request->sort_by 
+                    : 'created_at';
 
-                // Filter by price range
-                if ($request->has('min_price')) {
-                    $query->where('price', '>=', $request->get('min_price'));
-                }
-                if ($request->has('max_price')) {
-                    $query->where('price', '<=', $request->get('max_price'));
-                }
+                $sortOrder = $request->sort_order === 'asc' ? 'asc' : 'desc';
 
-                // Sort options
-                $sortBy = $request->get('sort_by', 'created_at');
-                $sortOrder = $request->get('sort_order', 'desc');
-
-                if (in_array($sortBy, ['title', 'price', 'created_at', 'duration_hours'])) {
-                    $query->orderBy($sortBy, $sortOrder);
-                }
-
-                return $query->with(['ratings'])
-                           ->withCount('lessons')
-                           ->paginate($request->get('per_page', 10));
+                return $query->orderBy($sortBy, $sortOrder)
+                           ->paginate($request->per_page ?? 10);
             });
 
-            return $this->successResponse(CourseResource::collection($courses), [
-                'ar' => 'تم جلب الكورسات بنجاح',
-                'en' => 'Courses retrieved successfully'
-            ]);
+            return $this->successResponse(
+                CourseResource::collection($courses),
+                __('messages.courses.retrieved')
+            );
 
         } catch (\Exception $e) {
-            Log::error('Courses index error: ' . $e->getMessage());
+            Log::error('Courses index error', [
+                'error' => $e->getMessage(),
+                'request' => $request->all()
+            ]);
             return $this->serverErrorResponse();
         }
     }
@@ -83,69 +78,63 @@ class CourseController extends Controller
     public function show($id, Request $request)
     {
         try {
-            // Get authenticated user (can be null for guests)
-            $user = auth('sanctum')->user();
+            $user = $request->user();
+            $course = Course::with(['ratings.user'])
+                          ->findOrFail($id);
 
-            // For public course access, allow guests but apply gender filtering for authenticated users
-            $course = Course::with(['lessons' => function($query) use ($user) {
-                $query->orderBy('order');
-                // If user is authenticated, filter lessons by gender
-                if ($user) {
-                    $query->where(function($q) use ($user) {
-                        $q->where('target_gender', 'both')
-                          ->orWhere('target_gender', $user->gender);
-                    });
-                } else {
-                    // For guests, show only lessons targeted for 'both' genders
-                    $query->where('target_gender', 'both');
-                }
-            }, 'ratings.user'])->findOrFail($id);</old_str>
-
-            // Check if course is active
             if (!$course->is_active) {
-                return $this->errorResponse([
-                    'ar' => 'هذا الكورس غير متاح حالياً',
-                    'en' => 'This course is not available'
-                ], 404);
+                return $this->errorResponse(__('messages.courses.not_available'), 404);
             }
+
+            $course->load(['lessons' => function($query) use ($user, $course) {
+                $query->orderBy('order');
+                
+                if ($user) {
+                    if ($user->isSubscribedTo($course->id)) {
+                        $query->where(function($q) use ($user) {
+                            $q->where('target_gender', 'both')
+                              ->orWhere('target_gender', $user->gender);
+                        });
+                    } else {
+                        $query->where('is_free', true)
+                              ->where(function($q) use ($user) {
+                                  $q->where('target_gender', 'both')
+                                    ->orWhere('target_gender', $user->gender);
+                              });
+                    }
+                } else {
+                    $query->where('is_free', true)
+                          ->where('target_gender', 'both');
+                }
+            }]);
 
             $course->average_rating = $course->averageRating();
             $course->total_ratings = $course->totalRatings();
+            $course->is_subscribed = $user ? $user->isSubscribedTo($id) : false;
+            $course->is_favorited = $user ? $user->hasFavorited($id) : false;
 
-            // Add user-specific data
-            if ($user) {
-                $course->is_subscribed = $user->isSubscribedTo($id);
-                $course->is_favorited = $user->hasFavorited($id);
-            } else {
-                $course->is_subscribed = false;
-                $course->is_favorited = false;
-            }</old_str>
-
-            return $this->successResponse(new CourseResource($course), [
-                'ar' => 'تم جلب بيانات الكورس بنجاح',
-                'en' => 'Course retrieved successfully'
-            ]);
+            return $this->successResponse(
+                new CourseResource($course),
+                __('messages.courses.retrieved')
+            );
 
         } catch (ModelNotFoundException $e) {
-            return $this->errorResponse([
-                'ar' => 'الكورس غير موجود',
-                'en' => 'Course not found'
-            ], 404);
+            return $this->errorResponse(__('messages.courses.not_found'), 404);
         } catch (\Exception $e) {
-            Log::error('Course show error: ' . $e->getMessage(), [
+            Log::error('Course show error', [
                 'course_id' => $id,
-                'user_id' => $user ? $user->id : 'guest',
+                'user_id' => $user?->id ?? 'guest',
                 'error' => $e->getMessage()
             ]);
             return $this->serverErrorResponse();
         }
-    }</old_str>
+    }
 
     public function store(Request $request)
     {
         try {
             $validator = Validator::make($request->all(), [
-                'title' => 'required|string|max:255',
+                'title' => 'required|string|max:255|unique:courses',
                 'description' => 'required|string',
                 'price' => 'required|numeric|min:0',
                 'level' => 'required|in:beginner,intermediate,advanced',
@@ -155,27 +144,31 @@ class CourseController extends Controller
                 'grade' => 'required|in:الاول,الثاني,الثالث',
                 'image' => 'nullable|image|max:2048',
             ], [
-                'title.required' => 'عنوان الكورس مطلوب|Course title is required',
-                'description.required' => 'وصف الكورس مطلوب|Course description is required',
-                'price.required' => 'سعر الكورس مطلوب|Course price is required',
-                'price.numeric' => 'السعر يجب أن يكون رقم|Price must be a number',
-                'level.required' => 'مستوى الكورس مطلوب|Course level is required',
-                'target_gender.required' => 'الجنس المستهدف مطلوب|Target gender is required',
-                'grade.required' => 'الصف الدراسي مطلوب|Grade is required',
-                'image.image' => 'الملف المرفوع يجب أن يكون صورة|Uploaded file must be an image',
-                'image.max' => 'حجم الصورة يجب ألا يزيد عن 2 ميجابايت|Image size must not exceed 2MB'
+                'title.required' => __('validation.courses.title_required'),
+                'description.required' => __('validation.courses.description_required'),
+                'price.required' => __('validation.courses.price_required'),
+                'level.required' => __('validation.courses.level_required'),
+                'target_gender.required' => __('validation.courses.gender_required'),
+                'grade.required' => __('validation.courses.grade_required'),
+                'image.image' => __('validation.courses.image_type'),
+                'image.max' => __('validation.courses.image_size')
             ]);
 
             if ($validator->fails()) {
                 return $this->validationErrorResponse(new ValidationException($validator));
             }
 
-            $data = $request->all();
+            $data = $request->except('image');
 
             if ($request->hasFile('image')) {
-                $data['image'] = $request->file('image')->store('courses', 'public');
+                $image = $request->file('image');
+                $path = $image->store('courses', 'public');
+                
+                // $imageService = new ImageOptimizer();
+                // $imageService->optimize(storage_path('app/public/' . $path));
+                
+                $data['image'] = $path;
             } else {
-                // توليد صورة تلقائية
                 $imageGenerator = new CourseImageGenerator();
                 $data['image'] = $imageGenerator->generateCourseImage(
                     $request->title,
@@ -185,15 +178,22 @@ class CourseController extends Controller
                 );
             }
 
+            $data['user_id'] = $request->user()->id;
             $course = Course::create($data);
 
-            return $this->successResponse(new CourseResource($course), [
-                'ar' => 'تم إنشاء الكورس بنجاح',
-                'en' => 'Course created successfully'
-            ], 201);
+            Cache::tags('courses')->flush();
+
+            return $this->successResponse(
+                new CourseResource($course),
+                __('messages.courses.created'),
+                201
+            );
 
         } catch (\Exception $e) {
-            Log::error('Course creation error: ' . $e->getMessage());
+            Log::error('Course creation error', [
+                'error' => $e->getMessage(),
+                'request' => $request->except('image')
+            ]);
             return $this->serverErrorResponse();
         }
     }
@@ -203,8 +203,12 @@ class CourseController extends Controller
         try {
             $course = Course::findOrFail($id);
 
+            if ($request->user()->cannot('update', $course)) {
+                return $this->errorResponse(__('messages.unauthorized'), 403);
+            }
+
             $validator = Validator::make($request->all(), [
-                'title' => 'sometimes|string|max:255',
+                'title' => 'sometimes|string|max:255|unique:courses,title,' . $id,
                 'description' => 'sometimes|string',
                 'price' => 'sometimes|numeric|min:0',
                 'level' => 'sometimes|in:beginner,intermediate,advanced',
@@ -214,39 +218,47 @@ class CourseController extends Controller
                 'image' => 'nullable|image|max:2048',
                 'is_active' => 'sometimes|boolean',
             ], [
-                'title.string' => 'عنوان الكورس يجب أن يكون نص|Course title must be a string',
-                'price.numeric' => 'السعر يجب أن يكون رقم|Price must be a number',
-                'image.image' => 'الملف المرفوع يجب أن يكون صورة|Uploaded file must be an image',
-                'image.max' => 'حجم الصورة يجب ألا يزيد عن 2 ميجابايت|Image size must not exceed 2MB'
+                'title.string' => __('validation.courses.title_string'),
+                'price.numeric' => __('validation.courses.price_numeric'),
+                'image.image' => __('validation.courses.image_type'),
+                'image.max' => __('validation.courses.image_size')
             ]);
 
             if ($validator->fails()) {
                 return $this->validationErrorResponse(new ValidationException($validator));
             }
 
-            $data = $request->all();
+            $data = $request->except('image');
 
             if ($request->hasFile('image')) {
-                if ($course->image) {
+                if ($course->image && Storage::disk('public')->exists($course->image)) {
                     Storage::disk('public')->delete($course->image);
                 }
-                $data['image'] = $request->file('image')->store('courses', 'public');
+
+                $image = $request->file('image');
+                $path = $image->store('courses', 'public');
+                
+                // $imageService = new ImageOptimizer();
+                // $imageService->optimize(storage_path('app/public/' . $path));
+                
+                $data['image'] = $path;
             }
 
             $course->update($data);
+            Cache::tags('courses')->flush();
 
-            return $this->successResponse(new CourseResource($course), [
-                'ar' => 'تم تحديث الكورس بنجاح',
-                'en' => 'Course updated successfully'
-            ]);
+            return $this->successResponse(
+                new CourseResource($course),
+                __('messages.courses.updated')
+            );
 
         } catch (ModelNotFoundException $e) {
-            return $this->errorResponse([
-                'ar' => 'الكورس غير موجود',
-                'en' => 'Course not found'
-            ], 404);
+            return $this->errorResponse(__('messages.courses.not_found'), 404);
         } catch (\Exception $e) {
-            Log::error('Course update error: ' . $e->getMessage());
+            Log::error('Course update error', [
+                'course_id' => $id,
+                'error' => $e->getMessage()
+            ]);
             return $this->serverErrorResponse();
         }
     }
@@ -256,24 +268,29 @@ class CourseController extends Controller
         try {
             $course = Course::findOrFail($id);
 
-            if ($course->image) {
+            if (request()->user()->cannot('delete', $course)) {
+                return $this->errorResponse(__('messages.unauthorized'), 403);
+            }
+
+            if ($course->image && Storage::disk('public')->exists($course->image)) {
                 Storage::disk('public')->delete($course->image);
             }
 
             $course->delete();
+            Cache::tags('courses')->flush();
 
-            return $this->successResponse([], [
-                'ar' => 'تم حذف الكورس بنجاح',
-                'en' => 'Course deleted successfully'
-            ]);
+            return $this->successResponse(
+                null,
+                __('messages.courses.deleted')
+            );
 
         } catch (ModelNotFoundException $e) {
-            return $this->errorResponse([
-                'ar' => 'الكورس غير موجود',
-                'en' => 'Course not found'
-            ], 404);
+            return $this->errorResponse(__('messages.courses.not_found'), 404);
         } catch (\Exception $e) {
-            Log::error('Course deletion error: ' . $e->getMessage());
+            Log::error('Course deletion error', [
+                'course_id' => $id,
+                'error' => $e->getMessage()
+            ]);
             return $this->serverErrorResponse();
         }
     }
