@@ -17,6 +17,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Storage;
 
 class AuthController extends Controller
 {
@@ -28,8 +29,8 @@ class AuthController extends Controller
                 'name' => 'required|string|max:255',
                 'email' => 'required|string|email|max:255|unique:users',
                 'password' => 'required|string|min:8|confirmed',
-                'phone' => 'nullable|string|max:20',
-                'gender' => 'nullable|in:male,female'
+                'phone' => 'required|string|max:20|unique:users',
+                'gender' => 'required|in:male,female'
             ], [
                 'name.required' => 'الاسم مطلوب|Name is required',
                 'name.string' => 'الاسم يجب أن يكون نص|Name must be a string',
@@ -40,7 +41,10 @@ class AuthController extends Controller
                 'password.required' => 'كلمة المرور مطلوبة|Password is required',
                 'password.min' => 'كلمة المرور يجب ألا تقل عن 8 أحرف|Password must be at least 8 characters',
                 'password.confirmed' => 'تأكيد كلمة المرور غير مطابق|Password confirmation does not match',
+                'phone.required' => 'رقم الهاتف مطلوب|Phone number is required',
                 'phone.max' => 'رقم الهاتف يجب ألا يزيد عن 20 رقم|Phone number must not exceed 20 digits',
+                'phone.unique' => 'رقم الهاتف مستخدم بالفعل|Phone number already exists',
+                'gender.required' => 'الجنس مطلوب|Gender is required',
                 'gender.in' => 'الجنس يجب أن يكون ذكر أو أنثى|Gender must be male or female'
             ]);
 
@@ -286,25 +290,59 @@ class AuthController extends Controller
 
     public function updateProfile(Request $request)
     {
-        $user = $request->user();
+        try {
+            $user = $request->user();
 
-        $request->validate([
-            'name' => 'nullable|string|max:255',
-            'image' => 'nullable|image|max:2048',
-        ]);
+            $validator = Validator::make($request->all(), [
+                'name' => 'nullable|string|max:255',
+                'phone' => 'nullable|string|max:20|unique:users,phone,' . $user->id,
+                'image' => 'nullable|image|max:2048',
+            ], [
+                'name.string' => 'الاسم يجب أن يكون نص|Name must be a string',
+                'name.max' => 'الاسم يجب ألا يزيد عن 255 حرف|Name must not exceed 255 characters',
+                'phone.string' => 'رقم الهاتف يجب أن يكون نص|Phone must be a string',
+                'phone.max' => 'رقم الهاتف يجب ألا يزيد عن 20 رقم|Phone number must not exceed 20 digits',
+                'phone.unique' => 'رقم الهاتف مستخدم بالفعل|Phone number already exists',
+                'image.image' => 'الملف المرفوع يجب أن يكون صورة|Uploaded file must be an image',
+                'image.max' => 'حجم الصورة يجب ألا يزيد عن 2 ميجابايت|Image size must not exceed 2MB'
+            ]);
 
-        if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('profiles', 'public');
-            $user->image = $path;
+            if ($validator->fails()) {
+                return $this->validationErrorResponse(new ValidationException($validator));
+            }
+
+            // Update image if provided
+            if ($request->hasFile('image')) {
+                // Delete old image if exists
+                if ($user->image && Storage::disk('public')->exists($user->image)) {
+                    Storage::disk('public')->delete($user->image);
+                }
+                $user->image = $request->file('image')->store('profiles', 'public');
+            }
+
+            // Update name if provided
+            if ($request->filled('name')) {
+                $user->name = $request->name;
+            }
+
+            // Update phone if provided
+            if ($request->filled('phone')) {
+                $user->phone = $request->phone;
+            }
+
+            $user->save();
+
+            return $this->successResponse([
+                'user' => $user->only(['id', 'name', 'email', 'phone', 'gender', 'image'])
+            ], [
+                'ar' => 'تم تحديث الملف الشخصي بنجاح',
+                'en' => 'Profile updated successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Profile update error: ' . $e->getMessage());
+            return $this->serverErrorResponse();
         }
-
-        if ($request->filled('name')) {
-            $user->name = $request->name;
-        }
-
-        $user->save();
-
-        return response()->json(['message' => __('messages.auth.profile_updated_successfully'), 'user' => $user]);
     }
 
     public function forgotPassword(Request $request)
