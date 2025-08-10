@@ -22,6 +22,7 @@ class AuthController extends Controller
 {
     public function register(Request $request)
     {
+        $something = null; // Placeholder for any additional data if needed
         try {
             $validator = Validator::make($request->all(), [
                 'name' => 'required|string|max:255',
@@ -201,17 +202,17 @@ class AuthController extends Controller
             }
 
             // Clear session if exists
-            if ($user->session_id) {
+            if ($user->active_session_id) {
                 $user->update(['session_id' => null]);
             }
 
-            return $this->successResponse(null, [
+            return $this->successResponse($something ?? [
                 'ar' => 'تم تسجيل الخروج بنجاح',
                 'en' => 'Logged out successfully'
             ]);
 
         } catch (\Exception $e) {
-            \Log::error('Logout error: ' . $e->getMessage());
+            Log::error('Logout error: ' . $e->getMessage());
             return $this->serverErrorResponse();
         }
     }
@@ -271,7 +272,7 @@ class AuthController extends Controller
                 'password' => Hash::make($request->new_password)
             ]);
 
-            return $this->successResponse(null, [
+            return $this->successResponse($something ?? [
                 'ar' => 'تم تغيير كلمة المرور بنجاح',
                 'en' => 'Password changed successfully'
             ]);

@@ -8,7 +8,10 @@ use App\Models\Course;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use App\Http\Resources\CourseResource;
-
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Log;
+use App\Services\CourseImageGenerator; // Assuming this service exists for image generation
+use Illuminate\Support\Facades\Cache;
 class CourseController extends Controller
 {
     use ApiResponseTrait;
@@ -17,9 +20,9 @@ class CourseController extends Controller
         try {
             // Create cache key based on request parameters
             $cacheKey = 'courses_' . md5(serialize($request->all()));
-            
+
             // Cache for 30 minutes
-            $courses = \Cache::remember($cacheKey, 1800, function () use ($request) {
+            $courses = Cache::remember($cacheKey, 1800, function () use ($request) {
                 $query = Course::query()->where('is_active', true);
 
                 // Search functionality
@@ -69,7 +72,7 @@ class CourseController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            \Log::error('Courses index error: ' . $e->getMessage());
+            Log::error('Courses index error: ' . $e->getMessage());
             return $this->serverErrorResponse();
         }
     }
@@ -119,7 +122,7 @@ class CourseController extends Controller
         } catch (ModelNotFoundException $e) {
             return $this->notFoundResponse('Course');
         } catch (\Exception $e) {
-            \Log::error('Course show error: ' . $e->getMessage());
+            Log::error('Course show error: ' . $e->getMessage());
             return $this->serverErrorResponse();
         }
     }
@@ -144,7 +147,7 @@ class CourseController extends Controller
             $data['image'] = $request->file('image')->store('courses', 'public');
         } else {
             // توليد صورة تلقائية
-            $imageGenerator = new \App\Services\CourseImageGenerator();
+            $imageGenerator = new CourseImageGenerator();
             $data['image'] = $imageGenerator->generateCourseImage(
                 $request->title,
                 $request->price,
@@ -168,7 +171,7 @@ class CourseController extends Controller
             'price' => 'sometimes|numeric|min:0',
             'level' => 'sometimes|in:beginner,intermediate,advanced',
             'duration_hours' => 'nullable|integer|min:0',
-            'requirements' => 'nullable|string',  
+            'requirements' => 'nullable|string',
             'grade' => 'sometimes|in:الاول,الثاني,الثالث',
             'image' => 'nullable|image|max:2048',
             'is_active' => 'sometimes|boolean',
