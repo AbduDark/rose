@@ -43,7 +43,7 @@ Route::prefix('auth')->middleware('throttle:10,1')->group(function () {
 // Guest-accessible courses
 Route::get('courses',       [CourseController::class, 'index']);
 Route::get('courses/{id}',  [CourseController::class, 'show']);
-Route::get('courses/{id}/ratings', [RatingController::class, 'index']);</old_str>
+Route::get('courses/{id}/ratings', [RatingController::class, 'index']);
 
 // Authenticated User Routes
 Route::middleware(['auth:sanctum'])->group(function () {
