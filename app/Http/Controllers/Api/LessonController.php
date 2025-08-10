@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Traits\ApiResponseTrait;
 use App\Models\Lesson;
 use App\Models\Course;
 use Illuminate\Http\Request;
 
 class LessonController extends Controller
 {
+    use ApiResponseTrait;
     public function index($courseId, Request $request)
     {
         $course = Course::findOrFail($courseId);

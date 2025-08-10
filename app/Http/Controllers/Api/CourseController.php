@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Traits\ApiResponseTrait;
 use App\Models\Course;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -10,6 +11,7 @@ use App\Http\Resources\CourseResource;
 
 class CourseController extends Controller
 {
+    use ApiResponseTrait;
     public function index(Request $request)
     {
         try {

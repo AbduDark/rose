@@ -16,7 +16,10 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\LocalizationMiddleware::class,
             \App\Http\Middleware\SecurityLogMiddleware::class,
         ]);
-        
+        $middleware->api(append: [
+            \App\Http\Middleware\ApiErrorHandler::class,
+        ]);
+
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
             'role' => \App\Http\Middleware\RoleMiddleware::class,

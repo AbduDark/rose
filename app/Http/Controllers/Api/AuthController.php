@@ -15,70 +15,70 @@ use App\Mail\EmailVerificationMail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
+use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
     public function register(Request $request)
     {
-        $key = 'register:' . $request->ip();
-        if (RateLimiter::tooManyAttempts($key, 5)) {
-            return response()->json([
-                'message' => __('messages.general.error'),
-                'error' => 'Too many registration attempts. Try again later.'
-            ], 429);
+        try {
+            $validator = Validator::make($request->all(), [
+                'name' => 'required|string|max:255',
+                'email' => 'required|string|email|max:255|unique:users',
+                'password' => 'required|string|min:8|confirmed',
+                'phone' => 'nullable|string|max:20',
+                'gender' => 'nullable|in:male,female'
+            ], [
+                'name.required' => 'الاسم مطلوب|Name is required',
+                'name.string' => 'الاسم يجب أن يكون نص|Name must be a string',
+                'name.max' => 'الاسم يجب ألا يزيد عن 255 حرف|Name must not exceed 255 characters',
+                'email.required' => 'البريد الإلكتروني مطلوب|Email is required',
+                'email.email' => 'البريد الإلكتروني غير صحيح|Invalid email format',
+                'email.unique' => 'البريد الإلكتروني مستخدم بالفعل|Email already exists',
+                'password.required' => 'كلمة المرور مطلوبة|Password is required',
+                'password.min' => 'كلمة المرور يجب ألا تقل عن 8 أحرف|Password must be at least 8 characters',
+                'password.confirmed' => 'تأكيد كلمة المرور غير مطابق|Password confirmation does not match',
+                'phone.max' => 'رقم الهاتف يجب ألا يزيد عن 20 رقم|Phone number must not exceed 20 digits',
+                'gender.in' => 'الجنس يجب أن يكون ذكر أو أنثى|Gender must be male or female'
+            ]);
+
+            if ($validator->fails()) {
+                return $this->validationErrorResponse(new ValidationException($validator));
+            }
+
+            $pin = rand(100000, 999999);
+
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'phone' => $request->phone,
+                'gender' => $request->gender,
+                'pin' => $pin,
+                'pin_expires_at' => Carbon::now()->addMinutes(10),
+                'email_verified_at' => null
+            ]);
+
+            // Send verification email
+            try {
+                Mail::to($user->email)->send(new SendPinMail($user));
+            } catch (\Exception $e) {
+                Log::error('Email sending failed: ' . $e->getMessage());
+            }
+
+            return $this->successResponse([
+                'user' => $user->only(['id', 'name', 'email', 'phone', 'gender']),
+                'email_verification_required' => true
+            ], [
+                'ar' => 'تم تسجيل المستخدم بنجاح. يرجى التحقق من بريدك الإلكتروني للتحقق.',
+                'en' => 'User registered successfully. Please check your email for verification.'
+            ], 201);
+
+        } catch (\Exception $e) {
+            Log::error('Registration failed: ' . $e->getMessage());
+            return $this->serverErrorResponse();
         }
-
-        $validator = Validator::make($request->all(), [
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|string|email|unique:users',
-            'password' => 'required|string|min:8|confirmed|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/',
-            'gender'   => 'required|in:male,female',
-        ], [
-            'password.regex' => 'Password must contain at least one uppercase letter, one lowercase letter, one number and one special character.'
-        ]);
-
-        if ($validator->fails()) {
-            RateLimiter::hit($key, 300);
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
-        $deviceFingerprint = $this->generateDeviceFingerprint($request);
-
-        $user = User::create([
-            'name'     => $request->name,
-            'email'    => $request->email,
-            'password' => Hash::make($request->password),
-            'gender'   => $request->gender,
-            'device_fingerprint' => $deviceFingerprint,
-        ]);
-
-        // إرسال رابط التحقق من الإيميل
-        $token = Str::random(60);
-
-        EmailVerification::create([
-            'email' => $request->email,
-            'token' => $token,
-            'expires_at' => now()->addMinutes(60), // ساعة واحدة
-        ]);
-
-        $verificationUrl = url("/api/auth/verify-email?token={$token}");
-        Mail::to($request->email)->send(new EmailVerificationMail($verificationUrl));
-
-        // The token is created here, but the user is not logged in until email is verified.
-        // This is handled by the `email_verified_at` check in the login method.
-
-        Log::channel('security')->info('User registered', [
-            'user_id' => $user->id,
-            'email' => $user->email,
-            'ip' => $request->ip(),
-        ]);
-
-        RateLimiter::clear($key);
-
-        return response()->json([
-            'message' => __('messages.auth.registered_successfully'),
-            'email_verification_required' => true
-        ], 201);
     }
 
     public function login(Request $request)
@@ -493,5 +493,72 @@ class AuthController extends Controller
         ];
 
         return hash('sha256', json_encode($data));
+    }
+
+    /**
+     * Return a validation error response.
+     *
+     * @param  \Illuminate\Validation\ValidationException  $exception
+     * @return \Illuminate\Http\JsonResponse
+     */
+    protected function validationErrorResponse(ValidationException $exception)
+    {
+        $errors = $exception->errors();
+
+        $formattedErrors = [];
+        foreach ($errors as $field => $messages) {
+            $formattedErrors[$field] = [
+                'ar' => $messages[0] ?? 'خطأ في التحقق', // Arabic message
+                'en' => $messages[0] ?? 'Validation error', // English message
+            ];
+            // If there are multiple messages for a field, you might want to handle that differently
+            if (count($messages) > 1) {
+                $formattedErrors[$field]['en'] .= ' (and ' . (count($messages) - 1) . ' more)';
+                $formattedErrors[$field]['ar'] .= ' (و ' . (count($messages) - 1) . ' المزيد)';
+            }
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => [
+                'ar' => 'فشل التحقق من البيانات',
+                'en' => 'The given data failed to validate',
+            ],
+            'errors' => $formattedErrors,
+        ], 422);
+    }
+
+    /**
+     * Return a generic success response.
+     *
+     * @param  array  $data
+     * @param  array  $messages
+     * @param  int    $status
+     * @return \Illuminate\Http\JsonResponse
+     */
+    protected function successResponse(array $data = [], array $messages = ['en' => 'Success'], int $status = 200)
+    {
+        return response()->json([
+            'success' => true,
+            'message' => $messages,
+            'data' => $data,
+        ], $status);
+    }
+
+    /**
+     * Return a generic server error response.
+     *
+     * @param  string $message
+     * @return \Illuminate\Http\JsonResponse
+     */
+    protected function serverErrorResponse(string $message = 'An unexpected error occurred on the server.')
+    {
+        return response()->json([
+            'success' => false,
+            'message' => [
+                'ar' => 'حدث خطأ غير متوقع في الخادم.',
+                'en' => $message,
+            ],
+        ], 500);
     }
 }
