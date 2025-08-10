@@ -14,6 +14,7 @@ use App\Services\CourseImageGenerator; // Assuming this service exists for image
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use App\Models\Subscription; // Import Subscription model
 class CourseController extends Controller
 {
     use ApiResponseTrait;
@@ -82,18 +83,20 @@ class CourseController extends Controller
     public function show($id, Request $request)
     {
         try {
-            $course = Course::with(['lessons' => function($query) use ($request) {
+            $user = auth()->user();
+
+            // التحقق من وجود المستخدم
+            if (!$user) {
+                return $this->errorResponse(__('messages.auth.unauthenticated'), 401);
+            }
+
+            $course = Course::with(['lessons' => function($query) use ($user) {
                 // إذا كان المستخدم مسجل دخول، فلتر الدروس حسب الجنس
-                if ($request->user()) {
-                    $userGender = $request->user()->gender;
-                    $query->where(function($q) use ($userGender) {
-                        $q->where('target_gender', 'both')
-                          ->orWhere('target_gender', $userGender);
-                    });
-                } else {
-                    // للضيوف، عرض الدروس المتاحة للجميع فقط
-                    $query->where('target_gender', 'both');
-                }
+                $query->orderBy('order')
+                      ->where(function($q) use ($user) {
+                          $q->where('target_gender', 'both')
+                            ->orWhere('target_gender', $user->gender);
+                      });
             }, 'ratings.user'])->findOrFail($id);
 
             // Check if course is active
@@ -111,28 +114,30 @@ class CourseController extends Controller
             if ($request->user()) {
                 $course->is_subscribed = $request->user()->isSubscribedTo($id);
                 $course->is_favorited = $request->user()->hasFavorited($id);
-                
+
                 // للمستخدمين المسجلين، تحقق من قيود الجنس للكورس
-                if ($course->target_gender !== 'both') {
-                    $userGender = $request->user()->gender;
-                    if ($course->target_gender !== $userGender) {
-                        return $this->errorResponse([
-                            'ar' => 'هذا الكورس غير متاح لجنسك',
-                            'en' => 'This course is not available for your gender'
-                        ], 403);
-                    }
-                }
+                // This check is now handled at the lesson level
+                // if ($course->target_gender !== 'both') {
+                //     $userGender = $request->user()->gender;
+                //     if ($course->target_gender !== $userGender) {
+                //         return $this->errorResponse([
+                //             'ar' => 'هذا الكورس غير متاح لجنسك',
+                //             'en' => 'This course is not available for your gender'
+                //         ], 403);
+                //     }
+                // }
             } else {
                 $course->is_subscribed = false;
                 $course->is_favorited = false;
-                
+
                 // للضيوف، إخفاء الكورسات المخصصة لجنس معين
-                if ($course->target_gender !== 'both') {
-                    return $this->errorResponse([
-                        'ar' => 'يجب تسجيل الدخول لعرض هذا الكورس',
-                        'en' => 'Login required to view this course'
-                    ], 401);
-                }
+                // This check is now handled at the lesson level
+                // if ($course->target_gender !== 'both') {
+                //     return $this->errorResponse([
+                //         'ar' => 'يجب تسجيل الدخول لعرض هذا الكورس',
+                //         'en' => 'Login required to view this course'
+                //     ], 401);
+                // }
             }
 
             return $this->successResponse(new CourseResource($course), [
@@ -196,7 +201,7 @@ class CourseController extends Controller
             }
 
             $course = Course::create($data);
-            
+
             return $this->successResponse(new CourseResource($course), [
                 'ar' => 'تم إنشاء الكورس بنجاح',
                 'en' => 'Course created successfully'

@@ -1,4 +1,3 @@
-
 <?php
 
 namespace App\Http\Controllers\Api;
@@ -9,6 +8,7 @@ use App\Models\User;
 use App\Models\Course;
 use App\Models\Subscription;
 use App\Models\Payment;
+use App\Models\Lesson; // Added Lesson model
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
@@ -273,7 +273,7 @@ class AdminController extends Controller
     {
         try {
             $subscription = Subscription::findOrFail($id);
-            
+
             $subscription->update([
                 'is_approved' => true,
                 'is_active' => true,
@@ -300,7 +300,7 @@ class AdminController extends Controller
     {
         try {
             $subscription = Subscription::findOrFail($id);
-            
+
             $subscription->update([
                 'is_approved' => false,
                 'is_active' => false,
@@ -320,6 +320,70 @@ class AdminController extends Controller
         } catch (\Exception $e) {
             Log::error('Admin reject subscription error: ' . $e->getMessage());
             return $this->serverErrorResponse();
+        }
+    }
+
+    // إدارة الدروس
+    public function createLesson(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'course_id' => 'required|exists:courses,id',
+                'title' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'content' => 'nullable|string',
+                'video_url' => 'nullable|url',
+                'order' => 'required|integer|min:1',
+                'duration_minutes' => 'nullable|integer|min:1',
+                'is_free' => 'boolean',
+                'target_gender' => 'required|in:male,female,both',
+            ]);
+
+            if ($validator->fails()) {
+                return $this->errorResponse($validator->errors()->first(), 422);
+            }
+
+            $lesson = Lesson::create($request->all());
+
+            return $this->successResponse($lesson, __('messages.lesson.created_successfully'), 201);
+
+        } catch (\Exception $e) {
+            \Log::error('Error creating lesson: ' . $e->getMessage());
+            return $this->errorResponse(__('messages.general.server_error'), 500);
+        }
+    }
+
+    public function updateLesson(Request $request, $id)
+    {
+        try {
+            $lesson = Lesson::find($id);
+
+            if (!$lesson) {
+                return $this->errorResponse(__('messages.lesson.not_found'), 404);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'title' => 'sometimes|required|string|max:255',
+                'description' => 'nullable|string',
+                'content' => 'nullable|string',
+                'video_url' => 'nullable|url',
+                'order' => 'sometimes|required|integer|min:1',
+                'duration_minutes' => 'nullable|integer|min:1',
+                'is_free' => 'boolean',
+                'target_gender' => 'sometimes|required|in:male,female,both',
+            ]);
+
+            if ($validator->fails()) {
+                return $this->errorResponse($validator->errors()->first(), 422);
+            }
+
+            $lesson->update($request->all());
+
+            return $this->successResponse($lesson, __('messages.lesson.updated_successfully'));
+
+        } catch (\Exception $e) {
+            \Log::error('Error updating lesson: ' . $e->getMessage());
+            return $this->errorResponse(__('messages.general.server_error'), 500);
         }
     }
 }

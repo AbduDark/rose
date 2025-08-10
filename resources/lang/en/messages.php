@@ -88,4 +88,17 @@ return [
         'not_found' => 'Not Found',
         'internal_server_error' => 'Internal Server Error',
     ],
+
+    // Lesson messages
+    'lesson' => [
+        'not_found' => 'Lesson not found',
+        'retrieved_successfully' => 'Lesson retrieved successfully',
+        'created_successfully' => 'Lesson created successfully',
+        'updated_successfully' => 'Lesson updated successfully',
+        'gender_not_allowed' => 'This lesson is not available for your gender',
+        'comment_added' => 'Comment added successfully',
+        'comment_updated' => 'Comment updated successfully',
+        'comment_deleted' => 'Comment deleted successfully',
+        'comment_not_found' => 'Comment not found',
+    ],
 ];

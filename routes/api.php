@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\CommentController;
 use App\Http\Controllers\Api\RatingController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\AdminController; // Import AdminController
 use App\Http\Middleware\AdminMiddleware;
 
 // Health check endpoint

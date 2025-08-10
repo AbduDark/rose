@@ -89,4 +89,17 @@ return [
         'not_found' => 'غير موجود',
         'internal_server_error' => 'خطأ في الخادم الداخلي',
     ],
+
+    // Lesson messages
+    'lesson' => [
+        'not_found' => 'الدرس غير موجود',
+        'retrieved_successfully' => 'تم استرداد الدرس بنجاح',
+        'created_successfully' => 'تم إنشاء الدرس بنجاح',
+        'updated_successfully' => 'تم تحديث الدرس بنجاح',
+        'gender_not_allowed' => 'هذا الدرس غير متاح لجنسك',
+        'comment_added' => 'تم إضافة التعليق بنجاح',
+        'comment_updated' => 'تم تحديث التعليق بنجاح',
+        'comment_deleted' => 'تم حذف التعليق بنجاح',
+        'comment_not_found' => 'التعليق غير موجود',
+    ],
 ];

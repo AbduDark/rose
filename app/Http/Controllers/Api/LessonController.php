@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Traits\ApiResponseTrait;
 use App\Models\Lesson;
 use App\Models\Course;
+use App\Models\Subscription; // Import Subscription model
 use Illuminate\Http\Request;
 
 class LessonController extends Controller
@@ -15,7 +16,7 @@ class LessonController extends Controller
     {
         $course = Course::findOrFail($courseId);
         $user = $request->user();
-        
+
         if (!$user) {
             return response()->json(['message' => 'يجب تسجيل الدخول لعرض الدروس'], 401);
         }
@@ -83,5 +84,51 @@ class LessonController extends Controller
         $lesson->delete();
 
         return response()->json(['message' => 'Lesson deleted successfully']);
+    }
+
+    public function show($id)
+    {
+        try {
+            $user = auth()->user();
+
+            if (!$user) {
+                return $this->errorResponse(__('messages.auth.unauthenticated'), 401);
+            }
+
+            $lesson = Lesson::with(['course', 'comments.user'])->find($id);
+
+            if (!$lesson) {
+                return $this->errorResponse(__('messages.lesson.not_found'), 404);
+            }
+
+            // التحقق من توافق الجنس
+            if ($lesson->target_gender !== 'both' && $lesson->target_gender !== $user->gender) {
+                return $this->errorResponse(__('messages.lesson.gender_not_allowed'), 403);
+            }
+
+            // التحقق من حالة الكورس
+            if (!$lesson->course->is_active) {
+                return $this->errorResponse(__('messages.course.not_active'), 403);
+            }
+
+            // التحقق من الاشتراك إذا لم يكن الدرس مجاني
+            if (!$lesson->is_free) {
+                $subscription = Subscription::where('user_id', $user->id)
+                    ->where('course_id', $lesson->course_id)
+                    ->where('is_active', true)
+                    ->where('is_approved', true)
+                    ->first();
+
+                if (!$subscription) {
+                    return $this->errorResponse(__('messages.subscription.required'), 403);
+                }
+            }
+
+            return $this->successResponse($lesson, __('messages.lesson.retrieved_successfully'));
+
+        } catch (\Exception $e) {
+            \Log::error('Error retrieving lesson: ' . $e->getMessage());
+            return $this->errorResponse(__('messages.general.server_error'), 500);
+        }
     }
 }
