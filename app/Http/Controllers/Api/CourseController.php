@@ -30,7 +30,7 @@ class CourseController extends Basecontroller
             $cacheKey = 'courses_' . md5(serialize($request->all()));
 
             $courses = Cache::remember($cacheKey, now()->addMinutes(30), function () use ($request) {
-                $query = Course::active()
+                $query = Course::where('is_active', true)
                     ->with(['ratings'])
                     ->withCount('lessons');
 
