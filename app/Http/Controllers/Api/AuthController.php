@@ -11,9 +11,10 @@ use Illuminate\Support\Facades\Log;
 use App\Models\EmailVerification;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\SendPinMail;
-use App\Mail\EmailVerificationMail; // Import the new Mail class
+use App\Mail\EmailVerificationMail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 
 class AuthController extends Controller
 {
@@ -181,21 +182,55 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        $user = $request->user();
+        try {
+            $user = $request->user();
 
-        Log::channel('security')->info('User logged out', [
-            'user_id' => $user->id,
-            'ip' => $request->ip(),
-        ]);
+            if (!$user) {
+                return response()->json([
+                    'message' => 'User not authenticated'
+                ], 401);
+            }
 
-        $user->update([
-            'active_session_id' => null,
-            'device_fingerprint' => null,
-        ]);
+            // تسجيل محاولة تسجيل الخروج
+            Log::channel('security')->info('User logout attempt', [
+                'user_id' => $user->id,
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent()
+            ]);
 
-        $user->currentAccessToken()->delete();
+            // حذف التوكن الحالي
+            if ($request->bearerToken()) {
+                $user->tokens()->where('id', $user->currentAccessToken()->id)->delete();
+            }
 
-        return response()->json(['message' => __('messages.auth.logged_out_successfully')]);
+            // تحديث بيانات الجلسة
+            $user->update([
+                'active_session_id' => null,
+                'device_fingerprint' => null,
+                'last_logout_at' => now()
+            ]);
+
+            Log::channel('security')->info('User logged out successfully', [
+                'user_id' => $user->id,
+                'ip' => $request->ip()
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => __('messages.auth.logged_out_successfully')
+            ]);
+        } catch (\Exception $e) {
+            Log::channel('security')->error('Error during logout', [
+                'error' => $e->getMessage(),
+                'user_id' => $user->id ?? null,
+                'ip' => $request->ip()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'حدث خطأ أثناء تسجيل الخروج'
+            ], 500);
+        }
     }
 
     public function forceLogout(Request $request)
@@ -309,46 +344,64 @@ class AuthController extends Controller
 
     public function verifyEmail(Request $request)
     {
-        $token = $request->query('token');
+        DB::beginTransaction();
+        try {
+            $token = $request->query('token');
 
-        if (!$token) {
-            return response()->json([
-                'success' => false,
-                'message' => 'رابط التحقق غير صالح'
-            ], 400);
-        }
+            if (!$token) {
+                throw new \Exception('رابط التحقق غير صالح');
+            }
 
-        $verification = EmailVerification::where('token', $token)->first();
+            $verification = EmailVerification::where('token', $token)
+                ->where('expires_at', '>', now())
+                ->first();
 
-        if (!$verification) {
-            return response()->json([
-                'success' => false,
-                'message' => 'رابط التحقق غير صالح'
-            ], 400);
-        }
+            if (!$verification) {
+                throw new \Exception('رابط التحقق غير صالح أو منتهي الصلاحية');
+            }
 
-        if ($verification->isExpired()) { // Assuming isExpired() method exists in EmailVerification model
+            $user = User::where('email', $verification->email)->first();
+
+            if (!$user) {
+                throw new \Exception('المستخدم غير موجود');
+            }
+
+            // تحديث حالة التحقق من البريد
+            $user->email_verified_at = now();
+            $user->save();
+
+            // حذف سجل التحقق بعد نجاح التحقق
             $verification->delete();
-            return response()->json([
-                'success' => false,
-                'message' => 'رابط التحقق منتهي الصلاحية'
-            ], 400);
-        }
 
-        // تفعيل المستخدم
-        $user = User::where('email', $verification->email)->first();
-        if ($user) {
-            $user->update(['email_verified_at' => now()]);
-            $verification->delete();
+            DB::commit();
+
+            // تسجيل العملية
+            Log::channel('security')->info('Email verified successfully', [
+                'user_id' => $user->id,
+                'email' => $user->email
+            ]);
 
             // إعادة توجيه إلى صفحة النجاح
             return redirect('/email-verified?success=true');
-        }
 
-        return response()->json([
-            'success' => false,
-            'message' => 'المستخدم غير موجود'
-        ], 404);
+        } catch (\Exception $e) {
+            DB::rollback();
+
+            Log::channel('security')->error('Error verifying email', [
+                'error' => $e->getMessage(),
+                'email' => $verification->email ?? 'unknown',
+                'token' => $token
+            ]);
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 400);
+            }
+
+            return redirect('/email-verified?error=' . urlencode($e->getMessage()));
+        }
     }
 
     public function resetPassword(Request $request)
