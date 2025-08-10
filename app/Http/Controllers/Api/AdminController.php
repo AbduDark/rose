@@ -2,13 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
+use Illuminate\Routing\Controller;
+use Illuminate\Routing\Controller as BaseController; // Add this line
 use App\Traits\ApiResponseTrait;
 use App\Models\User;
 use App\Models\Course;
 use App\Models\Subscription;
 use App\Models\Payment;
-use App\Models\Lesson; // Added Lesson model
+use App\Models\Lesson;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
@@ -348,7 +349,7 @@ class AdminController extends Controller
             return $this->successResponse($lesson, __('messages.lesson.created_successfully'), 201);
 
         } catch (\Exception $e) {
-            \Log::error('Error creating lesson: ' . $e->getMessage());
+            Log::error('Error creating lesson: ' . $e->getMessage());
             return $this->errorResponse(__('messages.general.server_error'), 500);
         }
     }
@@ -382,7 +383,7 @@ class AdminController extends Controller
             return $this->successResponse($lesson, __('messages.lesson.updated_successfully'));
 
         } catch (\Exception $e) {
-            \Log::error('Error updating lesson: ' . $e->getMessage());
+            Log::error('Error updating lesson: ' . $e->getMessage());
             return $this->errorResponse(__('messages.general.server_error'), 500);
         }
     }
