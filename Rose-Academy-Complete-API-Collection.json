@@ -1,9 +1,8 @@
-
 {
 	"info": {
-		"_postman_id": "rose-academy-complete-v3",
+		"_postman_id": "12345678-1234-1234-1234-123456789abc",
 		"name": "Rose Academy Complete API Collection",
-		"description": "Complete API collection for Rose Academy with authentication, courses, lessons, subscriptions, and admin operations",
+		"description": "Complete API collection for Rose Academy with all endpoints",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"variable": [
@@ -93,6 +92,36 @@
 					}
 				},
 				{
+					"name": "Admin Login",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"admin@example.com\",\n    \"password\": \"admin123\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/login",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "login"]
+						}
+					}
+				},
+				{
 					"name": "Logout",
 					"request": {
 						"method": "POST",
@@ -118,9 +147,9 @@
 					}
 				},
 				{
-					"name": "Update Profile",
+					"name": "Get Profile",
 					"request": {
-						"method": "PUT",
+						"method": "GET",
 						"header": [
 							{
 								"key": "Accept",
@@ -135,26 +164,6 @@
 								"value": "{{accept_language}}"
 							}
 						],
-						"body": {
-							"mode": "formdata",
-							"formdata": [
-								{
-									"key": "name",
-									"value": "أحمد محمد المحدث",
-									"type": "text"
-								},
-								{
-									"key": "phone",
-									"value": "01234567891",
-									"type": "text"
-								},
-								{
-									"key": "profile_image",
-									"type": "file",
-									"src": []
-								}
-							]
-						},
 						"url": {
 							"raw": "{{base_url}}/auth/profile",
 							"host": ["{{base_url}}"],
@@ -177,10 +186,6 @@
 								"value": "application/json"
 							},
 							{
-								"key": "Authorization",
-								"value": "Bearer {{user_token}}"
-							},
-							{
 								"key": "Content-Language",
 								"value": "{{accept_language}}"
 							}
@@ -193,7 +198,28 @@
 					}
 				},
 				{
-					"name": "Get Course Details",
+					"name": "Get Course Details (Guest)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/courses/1",
+							"host": ["{{base_url}}"],
+							"path": ["courses", "1"]
+						}
+					}
+				},
+				{
+					"name": "Get Course Details (Authenticated)",
 					"request": {
 						"method": "GET",
 						"header": [
@@ -220,63 +246,8 @@
 			]
 		},
 		{
-			"name": "Lessons",
-			"item": [
-				{
-					"name": "Get Lesson Details",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{user_token}}"
-							},
-							{
-								"key": "Content-Language",
-								"value": "{{accept_language}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/lessons/1",
-							"host": ["{{base_url}}"],
-							"path": ["lessons", "1"]
-						}
-					}
-				}
-			]
-		},
-		{
 			"name": "Admin",
 			"item": [
-				{
-					"name": "Dashboard",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							},
-							{
-								"key": "Content-Language",
-								"value": "{{accept_language}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/admin/dashboard",
-							"host": ["{{base_url}}"],
-							"path": ["admin", "dashboard"]
-						}
-					}
-				},
 				{
 					"name": "Create Course",
 					"request": {
@@ -297,7 +268,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"title\": \"دورة البرمجة الأساسية\",\n    \"description\": \"تعلم أساسيات البرمجة من الصفر\",\n    \"price\": 299.99,\n    \"level\": \"beginner\",\n    \"duration_hours\": 40,\n    \"requirements\": \"لا توجد متطلبات مسبقة\",\n    \"instructor_name\": \"د. أحمد محمد\",\n    \"language\": \"العربية\",\n    \"grade\": \"المرحلة الثانوية\"\n}",
+							"raw": "{\n    \"title\": \"دورة البرمجة الأساسية\",\n    \"description\": \"تعلم أساسيات البرمجة من الصفر\",\n    \"price\": 299.99,\n    \"level\": \"beginner\",\n    \"duration_hours\": 40,\n    \"requirements\": \"لا توجد متطلبات مسبقة\",\n    \"instructor_name\": \"د. أحمد محمد\",\n    \"language\": \"العربية\",\n    \"grade\": \"الثالث\"\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -308,99 +279,6 @@
 							"raw": "{{base_url}}/admin/courses",
 							"host": ["{{base_url}}"],
 							"path": ["admin", "courses"]
-						}
-					}
-				},
-				{
-					"name": "Create Lesson",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							},
-							{
-								"key": "Content-Language",
-								"value": "{{accept_language}}"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"course_id\": 1,\n    \"title\": \"مقدمة في البرمجة\",\n    \"description\": \"مقدمة شاملة عن البرمجة وأساسياتها\",\n    \"content\": \"محتوى الدرس هنا...\",\n    \"video_url\": \"https://example.com/video1\",\n    \"order\": 1,\n    \"duration_minutes\": 30,\n    \"is_free\": true,\n    \"target_gender\": \"both\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{base_url}}/admin/lessons",
-							"host": ["{{base_url}}"],
-							"path": ["admin", "lessons"]
-						}
-					}
-				},
-				{
-					"name": "Update Lesson",
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							},
-							{
-								"key": "Content-Language",
-								"value": "{{accept_language}}"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"title\": \"مقدمة في البرمجة - محدث\",\n    \"target_gender\": \"male\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{base_url}}/admin/lessons/1",
-							"host": ["{{base_url}}"],
-							"path": ["admin", "lessons", "1"]
-						}
-					}
-				},
-				{
-					"name": "Get Users",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Accept",
-								"value": "application/json"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							},
-							{
-								"key": "Content-Language",
-								"value": "{{accept_language}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/admin/users",
-							"host": ["{{base_url}}"],
-							"path": ["admin", "users"]
 						}
 					}
 				}

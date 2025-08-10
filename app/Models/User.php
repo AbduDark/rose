@@ -15,7 +15,7 @@ class User extends Authenticatable
 
     protected $fillable = [
         'name',
-        'email', 
+        'email',
         'password',
         'phone',
         'gender',
@@ -75,19 +75,16 @@ class User extends Authenticatable
     public function isSubscribedTo($courseId)
     {
         return $this->subscriptions()
-            ->where('course_id', $courseId)
-            ->where('is_active', true)
-            ->where('is_approved', true)
-            ->where(function ($query) {
-                $query->whereNull('expires_at')
-                      ->orWhere('expires_at', '>', now());
-            })
-            ->exists();
+                    ->where('course_id', $courseId)
+                    ->where('is_active', true)
+                    ->exists();
     }
 
     public function hasFavorited($courseId)
     {
-        return $this->favorites()->where('course_id', $courseId)->exists();
+        return $this->favorites()
+                    ->where('course_id', $courseId)
+                    ->exists();
     }
-    
+
 }

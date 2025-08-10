@@ -83,21 +83,23 @@ class CourseController extends Controller
     public function show($id, Request $request)
     {
         try {
-            $user = auth()->user();
+            // Get authenticated user (can be null for guests)
+            $user = auth('sanctum')->user();
 
-            // التحقق من وجود المستخدم
-            if (!$user) {
-                return $this->errorResponse(__('messages.auth.unauthenticated'), 401);
-            }
-
+            // For public course access, allow guests but apply gender filtering for authenticated users
             $course = Course::with(['lessons' => function($query) use ($user) {
-                // إذا كان المستخدم مسجل دخول، فلتر الدروس حسب الجنس
-                $query->orderBy('order')
-                      ->where(function($q) use ($user) {
-                          $q->where('target_gender', 'both')
-                            ->orWhere('target_gender', $user->gender);
-                      });
-            }, 'ratings.user'])->findOrFail($id);
+                $query->orderBy('order');
+                // If user is authenticated, filter lessons by gender
+                if ($user) {
+                    $query->where(function($q) use ($user) {
+                        $q->where('target_gender', 'both')
+                          ->orWhere('target_gender', $user->gender);
+                    });
+                } else {
+                    // For guests, show only lessons targeted for 'both' genders
+                    $query->where('target_gender', 'both');
+                }
+            }, 'ratings.user'])->findOrFail($id);</old_str>
 
             // Check if course is active
             if (!$course->is_active) {
@@ -110,35 +112,14 @@ class CourseController extends Controller
             $course->average_rating = $course->averageRating();
             $course->total_ratings = $course->totalRatings();
 
-            // Add user-specific data if authenticated
-            if ($request->user()) {
-                $course->is_subscribed = $request->user()->isSubscribedTo($id);
-                $course->is_favorited = $request->user()->hasFavorited($id);
-
-                // للمستخدمين المسجلين، تحقق من قيود الجنس للكورس
-                // This check is now handled at the lesson level
-                // if ($course->target_gender !== 'both') {
-                //     $userGender = $request->user()->gender;
-                //     if ($course->target_gender !== $userGender) {
-                //         return $this->errorResponse([
-                //             'ar' => 'هذا الكورس غير متاح لجنسك',
-                //             'en' => 'This course is not available for your gender'
-                //         ], 403);
-                //     }
-                // }
+            // Add user-specific data
+            if ($user) {
+                $course->is_subscribed = $user->isSubscribedTo($id);
+                $course->is_favorited = $user->hasFavorited($id);
             } else {
                 $course->is_subscribed = false;
                 $course->is_favorited = false;
-
-                // للضيوف، إخفاء الكورسات المخصصة لجنس معين
-                // This check is now handled at the lesson level
-                // if ($course->target_gender !== 'both') {
-                //     return $this->errorResponse([
-                //         'ar' => 'يجب تسجيل الدخول لعرض هذا الكورس',
-                //         'en' => 'Login required to view this course'
-                //     ], 401);
-                // }
-            }
+            }</old_str>
 
             return $this->successResponse(new CourseResource($course), [
                 'ar' => 'تم جلب بيانات الكورس بنجاح',
@@ -151,10 +132,14 @@ class CourseController extends Controller
                 'en' => 'Course not found'
             ], 404);
         } catch (\Exception $e) {
-            Log::error('Course show error: ' . $e->getMessage());
+            Log::error('Course show error: ' . $e->getMessage(), [
+                'course_id' => $id,
+                'user_id' => $user ? $user->id : 'guest',
+                'error' => $e->getMessage()
+            ]);
             return $this->serverErrorResponse();
         }
-    }
+    }</old_str>
 
     public function store(Request $request)
     {
