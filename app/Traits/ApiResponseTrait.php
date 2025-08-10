@@ -12,11 +12,11 @@ trait ApiResponseTrait
     protected function successResponse($data = null, $message = null, $statusCode = 200): JsonResponse
     {
         $locale = request()->attributes->get('locale', 'ar');
-        
+
         if (is_string($message)) {
             $message = ['ar' => $message, 'en' => $message];
         }
-        
+
         $response = [
             'success' => true,
             'status_code' => $statusCode,
@@ -30,24 +30,22 @@ trait ApiResponseTrait
         return response()->json($response, $statusCode);
     }
 
-    protected function errorResponse($message = null, $statusCode = 400, $errors = null): JsonResponse
+    protected function errorResponse($message, $statusCode = 400, $additionalData = []): JsonResponse
     {
-        $locale = request()->attributes->get('locale', 'ar');
-        
-        if (is_string($message)) {
-            $message = ['ar' => $message, 'en' => $message];
-        }
-        
-        $defaultMessage = $this->getDefaultErrorMessage($statusCode);
-        
+        $currentLanguage = app()->getLocale();
+
+        $errorMessage = is_array($message) 
+            ? ($message[$currentLanguage] ?? $message['en'] ?? 'Error occurred')
+            : $message;
+
         $response = [
             'success' => false,
             'status_code' => $statusCode,
-            'message' => $message[$locale] ?? $defaultMessage[$locale]
+            'message' => $errorMessage
         ];
 
-        if ($errors !== null) {
-            $response['errors'] = $errors;
+        if (!empty($additionalData)) {
+            $response = array_merge($response, $additionalData);
         }
 
         return response()->json($response, $statusCode);

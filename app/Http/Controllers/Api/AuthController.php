@@ -88,96 +88,125 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
-        $key = 'login:' . $request->ip();
-        if (RateLimiter::tooManyAttempts($key, 10)) {
-            $seconds = RateLimiter::availableIn($key);
-            return response()->json([
-                'message' => __('messages.general.error'),
-                'error' => 'Too many login attempts. Try again in ' . $seconds . ' seconds.'
-            ], 429);
-        }
+        try {
+            $key = 'login:' . $request->ip();
+            if (RateLimiter::tooManyAttempts($key, 10)) {
+                $seconds = RateLimiter::availableIn($key);
+                return $this->errorResponse([
+                    'ar' => 'محاولات دخول كثيرة جداً، حاول مرة أخرى خلال ' . $seconds . ' ثانية',
+                    'en' => 'Too many login attempts. Try again in ' . $seconds . ' seconds.'
+                ], 429);
+            }
 
-        $request->validate([
-            'email'    => 'required|email',
-            'password' => 'required',
-        ]);
-
-        $user = User::where('email', $request->email)->first();
-
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            RateLimiter::hit($key, 900);
-
-            Log::channel('security')->warning('Failed login attempt', [
-                'email' => $request->email,
-                'ip' => $request->ip(),
-                'user_agent' => $request->userAgent(),
+            $validator = Validator::make($request->all(), [
+                'email' => 'required|email',
+                'password' => 'required',
+            ], [
+                'email.required' => 'البريد الإلكتروني مطلوب|Email is required',
+                'email.email' => 'البريد الإلكتروني غير صحيح|Invalid email format',
+                'password.required' => 'كلمة المرور مطلوبة|Password is required',
             ]);
 
-            return response()->json(['message' => __('messages.auth.invalid_credentials')], 401);
-        }
+            if ($validator->fails()) {
+                return $this->validationErrorResponse(new ValidationException($validator));
+            }
 
-        // التحقق من تأكيد البريد الإلكتروني
-        if (!$user->email_verified_at) {
-            return response()->json([
-                'message' => __('messages.auth.email_not_verified'),
-                'email_verification_required' => true,
-                'email' => $user->email
-            ], 403);
-        }
+            $user = User::where('email', $request->email)->first();
 
-        // Check if user is already logged in on another device
-        $deviceFingerprint = $this->generateDeviceFingerprint($request);
+            if (!$user || !Hash::check($request->password, $user->password)) {
+                RateLimiter::hit($key, 900);
 
-        // Only check for multiple devices if user has an active session AND a stored device fingerprint
-        // This prevents issues for new users who just registered but haven't logged in before
-        if ($user->active_session_id &&
-            $user->device_fingerprint &&
-            $user->device_fingerprint !== $deviceFingerprint &&
-            $user->last_login_at) {
+                Log::channel('security')->warning('Failed login attempt', [
+                    'email' => $request->email,
+                    'ip' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                ]);
 
-            // Revoke all existing tokens
-            $user->tokens()->delete();
+                return $this->errorResponse([
+                    'ar' => 'بيانات الدخول غير صحيحة',
+                    'en' => 'Invalid credentials'
+                ], 401);
+            }
 
-            Log::channel('security')->warning('Multiple device login attempt', [
+            // التحقق من تأكيد البريد الإلكتروني
+            if (!$user->email_verified_at) {
+                return $this->errorResponse([
+                    'ar' => 'يجب تأكيد البريد الإلكتروني أولاً',
+                    'en' => 'Email verification required'
+                ], 403, [
+                    'email_verification_required' => true,
+                    'email' => $user->email
+                ]);
+            }
+
+            // Check if user is already logged in on another device
+            $deviceFingerprint = $this->generateDeviceFingerprint($request);
+
+            // Only check for multiple devices if user has an active session AND a stored device fingerprint
+            if ($user->active_session_id &&
+                $user->device_fingerprint &&
+                $user->device_fingerprint !== $deviceFingerprint &&
+                $user->last_login_at) {
+
+                // Revoke all existing tokens
+                $user->tokens()->delete();
+
+                Log::channel('security')->warning('Multiple device login attempt', [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'ip' => $request->ip(),
+                ]);
+
+                return $this->errorResponse([
+                    'ar' => 'أنت مسجل دخول على جهاز آخر، يرجى تسجيل الخروج من الجهاز الآخر أولاً',
+                    'en' => 'You are already logged in on another device. Please logout from that device first.'
+                ], 403);
+            }
+
+            $token = $user->createToken('auth_token')->plainTextToken;
+            $sessionId = Str::random(40);
+
+            $user->update([
+                'active_session_id' => $sessionId,
+                'device_fingerprint' => $deviceFingerprint,
+                'last_login_at' => now(),
+            ]);
+
+            Log::channel('security')->info('User logged in', [
                 'user_id' => $user->id,
                 'email' => $user->email,
                 'ip' => $request->ip(),
             ]);
 
-            return response()->json([
-                'message' => __('messages.auth.already_logged_in_another_device'),
-                'error' => 'You are already logged in on another device. Please logout from that device first.'
-            ], 403);
-        }
+            RateLimiter::clear($key);
 
-        $token = $user->createToken('auth_token')->plainTextToken;
-        $sessionId = Str::random(40);
-
-        $user->update([
-            'active_session_id' => $sessionId,
-            'device_fingerprint' => $deviceFingerprint,
-            'last_login_at' => now(),
-        ]);
-
-        Log::channel('security')->info('User logged in', [
-            'user_id' => $user->id,
-            'email' => $user->email,
-            'ip' => $request->ip(),
-        ]);
-
-        RateLimiter::clear($key);
-
-        return response()->json([
-            'token' => $token,
-            'session_id' => $sessionId,
-            'message' => __('messages.auth.login_done'),
-            'user' => [
+            $userData = [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'phone' => $user->phone,
+                'gender' => $user->gender,
                 'role' => $user->role ?? 'student',
-            ]
-        ]);
+            ];
+
+            if ($user->image) {
+                $userData['image'] = $user->image;
+                $userData['image_url'] = url('storage/' . $user->image);
+            }
+
+            return $this->successResponse([
+                'token' => $token,
+                'session_id' => $sessionId,
+                'user' => $userData
+            ], [
+                'ar' => 'تم تسجيل الدخول بنجاح',
+                'en' => 'Login successful'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Login error: ' . $e->getMessage());
+            return $this->serverErrorResponse();
+        }
     }
 
     public function profile(Request $request)
@@ -296,7 +325,7 @@ class AuthController extends Controller
             $validator = Validator::make($request->all(), [
                 'name' => 'nullable|string|max:255',
                 'phone' => 'nullable|string|max:20|unique:users,phone,' . $user->id,
-                'image' => 'nullable|image|max:2048',
+                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             ], [
                 'name.string' => 'الاسم يجب أن يكون نص|Name must be a string',
                 'name.max' => 'الاسم يجب ألا يزيد عن 255 حرف|Name must not exceed 255 characters',
@@ -304,6 +333,7 @@ class AuthController extends Controller
                 'phone.max' => 'رقم الهاتف يجب ألا يزيد عن 20 رقم|Phone number must not exceed 20 digits',
                 'phone.unique' => 'رقم الهاتف مستخدم بالفعل|Phone number already exists',
                 'image.image' => 'الملف المرفوع يجب أن يكون صورة|Uploaded file must be an image',
+                'image.mimes' => 'نوع الصورة يجب أن يكون jpeg, png, jpg, أو gif|Image must be jpeg, png, jpg, or gif',
                 'image.max' => 'حجم الصورة يجب ألا يزيد عن 2 ميجابايت|Image size must not exceed 2MB'
             ]);
 
@@ -332,8 +362,17 @@ class AuthController extends Controller
 
             $user->save();
 
+            // إعادة تحميل البيانات من قاعدة البيانات للتأكد من الحصول على أحدث البيانات
+            $user->refresh();
+
+            // إضافة URL كامل للصورة
+            $userData = $user->only(['id', 'name', 'email', 'phone', 'gender', 'image']);
+            if ($user->image) {
+                $userData['image_url'] = url('storage/' . $user->image);
+            }
+
             return $this->successResponse([
-                'user' => $user->only(['id', 'name', 'email', 'phone', 'gender', 'image'])
+                'user' => $userData
             ], [
                 'ar' => 'تم تحديث الملف الشخصي بنجاح',
                 'en' => 'Profile updated successfully'
@@ -367,6 +406,16 @@ class AuthController extends Controller
         ]);
 
         return response()->json(['message' => __('messages.auth.verification_pin_sent')]);
+    }
+
+    private function generateDeviceFingerprint(Request $request)
+    {
+        return hash('sha256', 
+            $request->userAgent() . 
+            $request->ip() . 
+            $request->header('Accept-Language', '') .
+            $request->header('Accept-Encoding', '')
+        );
     }
 
     public function verifyEmail(Request $request)

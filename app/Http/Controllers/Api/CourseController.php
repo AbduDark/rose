@@ -82,7 +82,19 @@ class CourseController extends Controller
     public function show($id, Request $request)
     {
         try {
-            $course = Course::with(['lessons', 'ratings.user'])->findOrFail($id);
+            $course = Course::with(['lessons' => function($query) use ($request) {
+                // إذا كان المستخدم مسجل دخول، فلتر الدروس حسب الجنس
+                if ($request->user()) {
+                    $userGender = $request->user()->gender;
+                    $query->where(function($q) use ($userGender) {
+                        $q->where('target_gender', 'both')
+                          ->orWhere('target_gender', $userGender);
+                    });
+                } else {
+                    // للضيوف، عرض الدروس المتاحة للجميع فقط
+                    $query->where('target_gender', 'both');
+                }
+            }, 'ratings.user'])->findOrFail($id);
 
             // Check if course is active
             if (!$course->is_active) {
@@ -92,24 +104,6 @@ class CourseController extends Controller
                 ], 404);
             }
 
-            // For courses with gender restrictions, require authentication
-            if ($course->target_gender !== 'both') {
-                if (!$request->user()) {
-                    return $this->errorResponse([
-                        'ar' => 'يجب تسجيل الدخول لعرض هذا الكورس',
-                        'en' => 'Login required to view this course'
-                    ], 401);
-                }
-
-                $userGender = $request->user()->gender;
-                if ($course->target_gender !== $userGender) {
-                    return $this->errorResponse([
-                        'ar' => 'هذا الكورس غير متاح لجنسك',
-                        'en' => 'This course is not available for your gender'
-                    ], 403);
-                }
-            }
-
             $course->average_rating = $course->averageRating();
             $course->total_ratings = $course->totalRatings();
 
@@ -117,9 +111,28 @@ class CourseController extends Controller
             if ($request->user()) {
                 $course->is_subscribed = $request->user()->isSubscribedTo($id);
                 $course->is_favorited = $request->user()->hasFavorited($id);
+                
+                // للمستخدمين المسجلين، تحقق من قيود الجنس للكورس
+                if ($course->target_gender !== 'both') {
+                    $userGender = $request->user()->gender;
+                    if ($course->target_gender !== $userGender) {
+                        return $this->errorResponse([
+                            'ar' => 'هذا الكورس غير متاح لجنسك',
+                            'en' => 'This course is not available for your gender'
+                        ], 403);
+                    }
+                }
             } else {
                 $course->is_subscribed = false;
                 $course->is_favorited = false;
+                
+                // للضيوف، إخفاء الكورسات المخصصة لجنس معين
+                if ($course->target_gender !== 'both') {
+                    return $this->errorResponse([
+                        'ar' => 'يجب تسجيل الدخول لعرض هذا الكورس',
+                        'en' => 'Login required to view this course'
+                    ], 401);
+                }
             }
 
             return $this->successResponse(new CourseResource($course), [

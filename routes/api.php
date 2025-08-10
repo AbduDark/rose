@@ -2,6 +2,16 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CourseController;
+use App\Http\Controllers\Api\LessonController;
+use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\FavoriteController;
+use App\Http\Controllers\Api\CommentController;
+use App\Http\Controllers\Api\RatingController;
+use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\UserController;
+use App\Http\Middleware\AdminMiddleware;
 
 // Health check endpoint
 Route::get('/', function () {
@@ -16,15 +26,7 @@ Route::get('/', function () {
 Route::get('/health', function () {
     return response()->json(['status' => 'OK', 'timestamp' => now()]);
 });
-use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\CourseController;
-use App\Http\Controllers\Api\LessonController;
-use App\Http\Controllers\Api\SubscriptionController;
-use App\Http\Controllers\Api\FavoriteController;
-use App\Http\Controllers\Api\CommentController;
-use App\Http\Controllers\Api\RatingController;
-use App\Http\Controllers\Api\PaymentController;
-use App\Http\Controllers\Api\UserController;
+
 
 // Public Routes
 Route::prefix('auth')->middleware('throttle:10,1')->group(function () {
@@ -76,36 +78,25 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('payments/history',             [PaymentController::class, 'getUserPaymentHistory']);
 });
 
-// Admin Routes
-Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
-    // Courses Management
-    Route::post('courses',        [CourseController::class, 'store']);
-    Route::put('courses/{id}',    [CourseController::class, 'update']);
-    Route::delete('courses/{id}', [CourseController::class, 'destroy']);
+// Admin Routes (Protected)
+Route::middleware(['auth:sanctum', AdminMiddleware::class])->prefix('admin')->group(function () {
+    // إدارة الكورسات
+    Route::apiResource('courses', CourseController::class)->except(['index', 'show']);
+    Route::apiResource('lessons', LessonController::class)->except(['index', 'show']);
 
-    // Lessons Management
-    Route::post('lessons',        [LessonController::class, 'store']);
-    Route::put('lessons/{id}',    [LessonController::class, 'update']);
-    Route::delete('lessons/{id}', [LessonController::class, 'destroy']);
+    // إدارة المستخدمين
+    Route::controller(App\Http\Controllers\Api\AdminController::class)->group(function () {
+        Route::get('users', 'getUsers');
+        Route::get('users/{id}', 'getUserDetails');
+        Route::put('users/{id}', 'updateUser');
+        Route::delete('users/{id}', 'deleteUser');
 
-    // Subscription Management
-    Route::get('admin/subscriptions/pending', [SubscriptionController::class, 'pendingSubscriptions']);
-    Route::put('admin/subscriptions/{id}/approve', [SubscriptionController::class, 'approveSubscription']);
-    Route::put('admin/subscriptions/{id}/reject', [SubscriptionController::class, 'rejectSubscription']);
+        // إحصائيات الدشبورد
+        Route::get('dashboard/stats', 'getDashboardStats');
 
-    // Payments Management
-    Route::get('admin/payments/pending',      [PaymentController::class, 'getPendingPayments']);
-    Route::get('admin/payments/stats',        [PaymentController::class, 'getPaymentStats']);
-    Route::put('admin/payments/{id}/approve', [PaymentController::class, 'approvePayment']);
-    Route::put('admin/payments/{id}/reject',  [PaymentController::class, 'rejectPayment']);
-
-    // Comments Management
-    Route::put('admin/comments/{id}/approve', [CommentController::class, 'approve']);
-    Route::put('admin/comments/{id}/reject',  [CommentController::class, 'reject']);
-    Route::get('admin/comments/pending',      [CommentController::class, 'pending']);
-
-    // User Management
-    Route::get('admin/users',         [UserController::class, 'index']);
-    Route::put('admin/users/{id}',    [UserController::class, 'update']);
-    Route::delete('admin/users/{id}', [UserController::class, 'destroy']);
+        // إدارة الاشتراكات
+        Route::get('subscriptions', 'getSubscriptions');
+        Route::post('subscriptions/{id}/approve', 'approveSubscription');
+        Route::post('subscriptions/{id}/reject', 'rejectSubscription');
+    });
 });
