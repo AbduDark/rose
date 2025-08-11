@@ -15,6 +15,7 @@ use App\Mail\EmailVerificationMail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use App\Traits\ApiResponseTrait;
 use Illuminate\Validation\ValidationException;
@@ -233,8 +234,7 @@ class AuthController extends Controller
     try {
         $user = $request->user();
 
-        // التحقق من وجود التوكن والمستخدم
-        if (!$user || !$request->bearerToken()) {
+        if (!$user) {
             return $this->errorResponse([
                 'ar' => 'يجب تسجيل الدخول أولاً',
                 'en' => 'You must be logged in to perform this action'
@@ -249,10 +249,16 @@ class AuthController extends Controller
             'user_agent' => $request->userAgent()
         ]);
 
-        // إلغاء التوكن الحالي فقط
-        $user->currentAccessToken()->delete();
+        // حل المشكلة المحتملة مع Sanctum
+        if (method_exists($user, 'currentAccessToken')) {
+            // إلغاء التوكن الحالي فقط (لـ Sanctum)
+            $user->currentAccessToken()->delete();
+        } else {
+            // حل بديل إذا كان هناك مشكلة مع currentAccessToken()
+            $request->user()->token()->revoke();
+        }
 
-        // مسح معرف الجلسة النشطة للجهاز الحالي فقط
+        // مسح بيانات الجلسة إذا كنت تستخدمها
         if ($user->active_session_id) {
             $user->update(['active_session_id' => null]);
         }
@@ -263,7 +269,7 @@ class AuthController extends Controller
         ]);
 
     } catch (\Exception $e) {
-        Log::error('Logout error for user ' . ($user->id ?? 'unknown') . ': ' . $e->getMessage(), [
+        Log::error('Logout error for user ' . ($request->user()?->id ?? 'unknown') . ': ' . $e->getMessage(), [
             'exception' => $e,
             'ip' => $request->ip()
         ]);
