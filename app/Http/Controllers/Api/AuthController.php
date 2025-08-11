@@ -439,7 +439,9 @@ class AuthController extends Controller
         ]);
 
         // Handle image upload
+
        if ($request->hasFile('image')) {
+        dd($request->file('image'));
     $image = $request->file('image');
 
     // حذف الصورة القديمة إذا كانت موجودة
@@ -462,6 +464,7 @@ class AuthController extends Controller
     // حفظ المسار في قاعدة البيانات
     $updateData['image'] = 'uploads/avatars/' . $imageName;
 }
+
 
 
         // Update user
