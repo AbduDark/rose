@@ -23,6 +23,17 @@ use Illuminate\Support\Facades\Storage;
 
 class AuthController extends Controller
 {
+    public function getAvatar($filename)
+{
+    $path = public_path('avatars/' . $filename);
+
+    if (!file_exists($path)) {
+        return response()->json(['error' => 'Image not found'], 404);
+    }
+
+    return response()->file($path);
+}
+
     public function register(Request $request)
 {
     try {
@@ -31,7 +42,8 @@ class AuthController extends Controller
             'email'    => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed|regex:/^(?=.*[a-zA-Z])(?=.*\d)[a-zA-Z\d]+$/',
             'phone'    => 'required|string|max:20|unique:users',
-            'gender'   => 'required|in:male,female'
+            'gender'   => 'required|in:male,female',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048'
         ], [
             'name.required'     => 'الاسم مطلوب|Name is required',
             'name.string'       => 'الاسم يجب أن يكون نص|Name must be a string',
@@ -56,9 +68,22 @@ class AuthController extends Controller
         $pin = rand(100000, 999999);
         $token = Str::random(60);
 
-        // مسار الصورة الافتراضية
-        $defaultAvatar = 'avatars/default.svg'; // داخل storage/app/public/avatars/default.png
+             if (!file_exists(public_path('avatars'))) {
+        mkdir(public_path('avatars'), 0777, true);
+    }
 
+    if ($request->hasFile('image')) {
+        $imageName = time() . '.' . $request->image->extension();
+        $request->image->move(public_path('avatars'), $imageName);
+    } else {
+        // لو مفيش صورة نعمل نسخة من default.svg
+        $imageName = 'default.svg';
+        $defaultPath = public_path('avatars/' . $imageName);
+        if (!file_exists($defaultPath)) {
+            // نتأكد أن الصورة الافتراضية موجودة
+            copy(public_path('default.svg'), $defaultPath);
+        }
+    }
         $user = User::create([
             'name'             => $request->name,
             'email'            => $request->email,
@@ -69,7 +94,7 @@ class AuthController extends Controller
             'pin_expires_at'   => Carbon::now()->addMinutes(10),
             'email_verified_at'=> null,
             'role'             => 'student',
-            'image'            => $defaultAvatar // حفظ الصورة الافتراضية
+            'image'            => 'avatars/' . $imageName, // نخزن المسار النسبي
         ]);
 
         // إنشاء سجل التحقق من البريد

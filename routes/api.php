@@ -39,6 +39,7 @@ Route::prefix('auth')->middleware('throttle:10,1')->group(function () {
     Route::post('reset-password',  [AuthController::class, 'resetPassword']);
     Route::post('force-logout',    [AuthController::class, 'forceLogout']);
     Route::post('/resend-pin', [AuthController::class, 'resendPin']);
+    Route::get('/avatars/{filename}', [UserController::class, 'getAvatar']);
 });
 
 // Guest-accessible courses
