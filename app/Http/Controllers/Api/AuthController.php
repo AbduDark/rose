@@ -72,15 +72,24 @@ class AuthController extends Controller
         mkdir(public_path('avatars'), 0777, true);
     }
 
-        $imagePath = 'avatars/default.svg';
+            $imagePath = 'uploads/avatars/default.svg';
 
-
-        if ($request->hasFile('image')) {
+    // لو رفع صورة
+    if ($request->hasFile('image')) {
         $image      = $request->file('image');
         $imageName  = uniqid('avatar_') . '.' . $image->getClientOriginalExtension();
-        $image->storeAs('public/avatars', $imageName);
-        $imagePath = 'avatars/' . $imageName;
+
+        // التأكد أن المسار موجود
+        $uploadPath = public_path('uploads/avatars');
+        if (!file_exists($uploadPath)) {
+            mkdir($uploadPath, 0777, true);
+        }
+
+        // حفظ الصورة
+        $image->move($uploadPath, $imageName);
+        $imagePath = 'uploads/avatars/' . $imageName;
     }
+
 
         $user = User::create([
             'name'             => $request->name,
@@ -116,8 +125,8 @@ class AuthController extends Controller
 
         // تجهيز بيانات الاستجابة مع رابط الصورة
         $userData = $user->only(['id', 'name', 'email', 'phone', 'gender', 'role']);
-        $userData['image_url'] = asset('storage/' . $user->image);
-
+        $userData['image_url'] =url($user->image);
+        
         return $this->successResponse([
             'user' => $userData,
             'email_verification_required' => true
