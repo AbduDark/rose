@@ -10,16 +10,22 @@ class PasswordResetMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public $token;
+    public $resetUrl;
+    public $user;
 
-    public function __construct($token)
+    public function __construct($resetUrl, $user)
     {
-        $this->token = $token;
+        $this->resetUrl = $resetUrl;
+        $this->user = $user;
     }
 
     public function build()
     {
         return $this->view('emails.password-reset')
-                   ->subject('إعادة تعيين كلمة المرور');
+                    ->subject('إعادة تعيين كلمة المرور')
+                    ->with([
+                        'resetUrl' => $this->resetUrl,
+                        'user' => $this->user
+                    ]);
     }
 }
