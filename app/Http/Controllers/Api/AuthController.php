@@ -419,11 +419,11 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'name'  => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:20|unique:users,phone,' . $user->id,
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
         ], [
-            'name.string'   => 'الاسم يجب أن يكون نص|Name must be a string',
-            'name.max'      => 'الاسم يجب ألا يزيد عن 255 حرف|Name must not exceed 255 characters',
-            'phone.string'  => 'رقم الهاتف يجب أن يكون نص|Phone must be a string',
+            'name.string'   => 'الاسم يجب أن يكون نص',
+            'name.max'      => 'الاسم يجب ألا يزيد عن 255 حرف',
+            'phone.string'  => 'رقم الهاتف يجب أن يكون نص',
             'phone.max'     => 'رقم الهاتف يجب ألا يزيد عن 20 رقم|Phone number must not exceed 20 digits',
             'phone.unique'  => 'رقم الهاتف مستخدم بالفعل|Phone number already exists',
             'image.image'   => 'الملف المرفوع يجب أن يكون صورة|Uploaded file must be an image',
