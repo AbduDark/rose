@@ -1,21 +1,21 @@
-
 <?php
 
 namespace App\Console\Commands;
 
 use App\Models\Subscription;
 use Illuminate\Console\Command;
+use App\Services\NotificationService; // افتراض أن لديك خدمة إشعارات
 
 class DeactivateExpiredSubscriptions extends Command
 {
     protected $signature = 'subscriptions:deactivate-expired';
-    protected $description = 'تعطيل الاشتراكات المنتهية الصلاحية تلقائياً';
+    protected $description = 'تعطيل الاشتراكات المنتهية الصلاحية تلقائياً وإرسال إشعارات';
 
     public function handle()
     {
-        $this->info('بدء عملية تعطيل الاشتراكات المنتهية الصلاحية...');
+        $this->info('بدء عملية تعطيل الاشتراكات المنتهية الصلاحية وإرسال الإشعارات...');
 
-        // العثور على الاشتراكات المنتهية الصلاحية والنشطة
+        // الحصول على الاشتراكات المنتهية الصلاحية قبل تعطيلها
         $expiredSubscriptions = Subscription::where('is_active', true)
             ->where('status', 'approved')
             ->where('expires_at', '<', now())
@@ -23,20 +23,23 @@ class DeactivateExpiredSubscriptions extends Command
 
         $this->info("تم العثور على {$expiredSubscriptions->count()} اشتراك منتهي الصلاحية");
 
-        $deactivatedCount = 0;
-
+        // إرسال إشعارات للمستخدمين
         foreach ($expiredSubscriptions as $subscription) {
-            $daysExpired = now()->diffInDays($subscription->expires_at);
-            
+            // افتراض أن NotificationService لديه دالة subscriptionExpired
+            // هذه الدالة يجب أن تكون مسؤولة عن إرسال الإشعار للمستخدم المحدد
+            NotificationService::subscriptionExpired($subscription->user_id, $subscription->course_id);
+            $this->line("تم إرسال إشعار للمستخدم {$subscription->user->name} بانتهاء اشتراكه في كورس {$subscription->course->title}");
+        }
+
+        // تعطيل الاشتراكات
+        $deactivatedCount = 0;
+        foreach ($expiredSubscriptions as $subscription) {
             $subscription->update(['is_active' => false]);
-            
-            $this->line("تم تعطيل اشتراك المستخدم {$subscription->user->name} في كورس {$subscription->course->title} (منتهي منذ {$daysExpired} يوم)");
-            
             $deactivatedCount++;
         }
 
         $this->info("تم تعطيل {$deactivatedCount} اشتراك منتهي الصلاحية بنجاح.");
-        
+
         return 0;
     }
 }

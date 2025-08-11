@@ -62,9 +62,14 @@ class User extends Authenticatable
         return $this->hasMany(Rating::class);
     }
 
-    public function payments()
+    public function notifications()
     {
-        return $this->hasMany(Payment::class);
+        return $this->hasMany(Notification::class);
+    }
+
+    public function sentNotifications()
+    {
+        return $this->hasMany(Notification::class, 'sender_id');
     }
 
     public function isAdmin()

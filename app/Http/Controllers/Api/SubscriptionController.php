@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Models\Subscription;
+use App\Services\NotificationService;
 use App\Traits\ApiResponseTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -109,15 +110,18 @@ class SubscriptionController extends Controller
                 ], 400);
             }
 
+            // تحديث حالة الاشتراك
             $subscription->update([
                 'status' => 'approved',
-                'is_approved' => true,
                 'is_active' => true,
+                'expires_at' => now()->addDays(30), // 30 يوم من تاريخ الموافقة
                 'approved_at' => now(),
                 'approved_by' => Auth::id(),
-                'expires_at' => now()->addDays(30), // 30 يوم من تاريخ الموافقة
                 'admin_notes' => $request->get('admin_notes')
             ]);
+
+            // إرسال إشعار للطالب
+            NotificationService::subscriptionApproved($subscription->user_id, $subscription->course_id);
 
             return $this->successResponse([
                 'subscription' => $subscription->load(['course', 'user', 'approvedBy'])
@@ -151,14 +155,18 @@ class SubscriptionController extends Controller
                 ], 400);
             }
 
+            // تحديث حالة الاشتراك
             $subscription->update([
                 'status' => 'rejected',
-                'is_approved' => false,
                 'is_active' => false,
                 'rejected_at' => now(),
                 'rejected_by' => Auth::id(),
                 'admin_notes' => $request->admin_notes
             ]);
+
+            // إرسال إشعار للطالب
+            $reason = $request->input('reason', 'لم يتم تحديد السبب');
+            NotificationService::subscriptionRejected($subscription->user_id, $subscription->course_id, $reason);
 
             return $this->successResponse([
                 'subscription' => $subscription->load(['course', 'user', 'rejectedBy'])

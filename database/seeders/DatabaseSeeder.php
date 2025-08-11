@@ -169,6 +169,7 @@ class DatabaseSeeder extends Seeder
 
         $this->call([
             LargeCourseSeeder::class,
+            NotificationSeeder::class,
         ]);
     }
 }

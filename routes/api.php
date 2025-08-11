@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\RatingController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\AdminController; // Import AdminController
+use App\Http\Controllers\Api\NotificationController; // Import NotificationController
 use App\Http\Middleware\AdminMiddleware;
 
 // Health check endpoint
@@ -55,13 +56,22 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::put('password',    [AuthController::class, 'changePassword']);
     });
 
-    // Subscriptions
+    // Subscription routes
     Route::post('/subscribe', [SubscriptionController::class, 'subscribe']);
     Route::get('/my-subscriptions', [SubscriptionController::class, 'mySubscriptions']);
     Route::post('/subscriptions/{id}/cancel', [SubscriptionController::class, 'cancelSubscription']);
     Route::post('/subscriptions/renew', [SubscriptionController::class, 'renewSubscription']);
     Route::get('/expired-subscriptions', [SubscriptionController::class, 'getExpiredSubscriptions']);
     Route::get('/subscriptions/status/{courseId}', [SubscriptionController::class, 'getSubscriptionStatus']);
+
+    // Notification routes
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::get('/notifications/{id}', [NotificationController::class, 'show']);
+    Route::put('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+    Route::put('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
+
 
     // Comments
     Route::post('comments', [CommentController::class, 'store']);
@@ -112,4 +122,13 @@ Route::middleware(['auth:sanctum', AdminMiddleware::class])->prefix('admin')->gr
         Route::get('comments/pending', 'getPendingComments');
         Route::post('comments/{id}/approve', 'approveComment');
     });
+
+    // Admin subscription management
+    Route::get('/admin/subscriptions', [SubscriptionController::class, 'adminIndex']);
+    Route::put('/admin/subscriptions/{id}/approve', [SubscriptionController::class, 'approve']);
+    Route::put('/admin/subscriptions/{id}/reject', [SubscriptionController::class, 'reject']);
+
+    // Admin notification management
+    Route::post('/admin/notifications/send', [NotificationController::class, 'sendNotification']);
+    Route::get('/admin/notifications/statistics', [NotificationController::class, 'statistics']);
 });
