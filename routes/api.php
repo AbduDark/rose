@@ -28,16 +28,17 @@ Route::get('/', function () {
 Route::get('/health', function () {
     return response()->json(['status' => 'OK', 'timestamp' => now()]);
 });
-Route::get('reset-password', function (Request $request) {
+
+
+
+// Public Routes
+Route::prefix('auth')->middleware('throttle:10,1')->group(function () {
+    Route::get('reset-password', function (Request $request) {
     return view('auth.reset-password', [
         'token' => $request->query('token'),
         'email' => $request->query('email')
     ]);
 });
-
-
-// Public Routes
-Route::prefix('auth')->middleware('throttle:10,1')->group(function () {
     Route::post('register',        [AuthController::class, 'register']);
     Route::post('login',           [AuthController::class, 'login']);
     Route::post('forgot-password', [AuthController::class, 'forgotPassword']);

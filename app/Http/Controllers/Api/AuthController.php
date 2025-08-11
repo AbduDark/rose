@@ -541,7 +541,8 @@ class AuthController extends Controller
 
             try {
                 // إرسال بريد إعادة التعيين
-                $resetUrl = url("/api/auth/reset-password?token={$token}&email=" . urlencode($request->email));
+                $resetUrl = url("/reset-password?token={$token}&email=" . urlencode($request->email));
+
                 Mail::to($request->email)->send(new PasswordResetMail($resetUrl, $user));
 
                 // تسجيل نجاح العملية
@@ -654,89 +655,77 @@ class AuthController extends Controller
         }
     }
 
-   public function resetPassword(Request $request)
-    {
-        try {
-            $validator = Validator::make($request->all(), [
-                'token' => 'required|string',
-                'email' => 'required|email',
-                'password' => [
-                    'required',
-                    'string',
-                    'min:8',
-                    'confirmed',
-                    'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/'
-                ]
-            ], [
-                'token.required' => 'رمز التحقق مطلوب|Reset token is required',
-                'email.required' => 'البريد الإلكتروني مطلوب|Email is required',
-                'email.email' => 'البريد الإلكتروني غير صحيح|Invalid email format',
-                'password.required' => 'كلمة المرور مطلوبة|Password is required',
-                'password.min' => 'كلمة المرور يجب ألا تقل عن 8 أحرف|Password must be at least 8 characters',
-                'password.confirmed' => 'تأكيد كلمة المرور غير متطابق|Password confirmation does not match',
-                'password.regex' => 'كلمة المرور يجب أن تحتوي على حرف كبير وصغير ورقم ورمز خاص|Password must contain uppercase, lowercase, number and special character'
-            ]);
+  public function resetPassword(Request $request)
+{
+    try {
+        $validator = Validator::make($request->all(), [
+            'token' => 'required',
+            'email' => 'required|email|exists:users,email',
+            'password' => 'required|min:6|confirmed',
+        ], [
+            'token.required' => 'رمز إعادة التعيين مطلوب|Reset token is required',
+            'email.required' => 'البريد الإلكتروني مطلوب|Email is required',
+            'email.email' => 'البريد الإلكتروني غير صحيح|Invalid email format',
+            'email.exists' => 'البريد الإلكتروني غير مسجل لدينا|Email not found in our records',
+            'password.required' => 'كلمة المرور مطلوبة|Password is required',
+            'password.min' => 'كلمة المرور يجب أن تكون 6 أحرف على الأقل|Password must be at least 6 characters',
+            'password.confirmed' => 'كلمة المرور غير متطابقة|Passwords do not match'
+        ]);
 
-            if ($validator->fails()) {
-                return $this->validationErrorResponse(new ValidationException($validator));
+        if ($validator->fails()) {
+            // إذا كان الطلب HTML
+            if ($request->expectsHtml()) {
+                return back()->withErrors($validator)->withInput();
             }
-
-            // التحقق من صحة الرمز
-            $verification = EmailVerification::where('token', $request->token)
-                ->where('email', $request->email)
-                ->where('expires_at', '>', now())
-                ->first();
-
-            if (!$verification) {
-                return $this->errorResponse([
-                    'ar' => 'رمز إعادة التعيين غير صالح أو منتهي الصلاحية',
-                    'en' => 'Invalid or expired reset token'
-                ], 422);
-            }
-
-            // العثور على المستخدم
-            $user = User::where('email', $request->email)->first();
-
-            if (!$user) {
-                return $this->errorResponse([
-                    'ar' => 'المستخدم غير موجود',
-                    'en' => 'User not found'
-                ], 404);
-            }
-
-            // تحديث كلمة المرور
-            $user->password = Hash::make($request->password);
-
-            // فرض تسجيل الخروج من جميع الأجهزة
-            $user->tokens()->delete();
-            $user->active_session_id = null;
-            $user->device_fingerprint = null;
-            $user->save();
-
-            // حذف رمز إعادة التعيين
-            $verification->delete();
-
-            // تسجيل العملية
-            Log::channel('security')->info('Password reset completed successfully', [
-                'user_id' => $user->id,
-                'email' => $user->email,
-                'ip' => $request->ip(),
-                'user_agent' => $request->userAgent()
-            ]);
-
-            return $this->successResponse([], [
-                'ar' => 'تم تغيير كلمة المرور بنجاح. يرجى تسجيل الدخول مرة أخرى',
-                'en' => 'Password has been reset successfully. Please login again'
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Password reset error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            return $this->serverErrorResponse();
+            // إذا كان الطلب API
+            return $this->validationErrorResponse(new ValidationException($validator));
         }
+
+        $record = EmailVerification::where('email', $request->email)
+            ->where('token', $request->token)
+            ->where('expires_at', '>', now())
+            ->first();
+
+        if (!$record) {
+            if ($request->expectsHtml()) {
+                return back()->with('error', 'رابط إعادة التعيين غير صالح أو منتهي الصلاحية');
+            }
+            return $this->errorResponse([
+                'ar' => 'رابط إعادة التعيين غير صالح أو منتهي الصلاحية',
+                'en' => 'Invalid or expired reset link'
+            ], 400);
+        }
+
+        $user = User::where('email', $request->email)->first();
+        $user->password = bcrypt($request->password);
+        $user->save();
+
+        // حذف التوكن بعد الاستخدام
+        $record->delete();
+
+        if ($request->expectsHtml()) {
+            return view('auth.reset-success'); // صفحة HTML نجاح
+        }
+
+        return $this->successResponse([], [
+            'ar' => 'تم تغيير كلمة المرور بنجاح',
+            'en' => 'Password changed successfully'
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('Reset password error', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        if ($request->expectsHtml()) {
+            return back()->with('error', 'حدث خطأ أثناء إعادة تعيين كلمة المرور');
+        }
+
+        return $this->serverErrorResponse();
     }
+}
+
 
  public function resendVerification(Request $request)
     {
