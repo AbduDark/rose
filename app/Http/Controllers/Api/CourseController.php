@@ -51,8 +51,8 @@ class CourseController extends Basecontroller
                      ->when($request->max_price, fn($q, $max) => $q->where('price', '<=', $max));
 
                 // Sorting
-                $sortBy = in_array($request->sort_by, ['title', 'price', 'created_at', 'duration_hours']) 
-                    ? $request->sort_by 
+                $sortBy = in_array($request->sort_by, ['title', 'price', 'created_at', 'duration_hours'])
+                    ? $request->sort_by
                     : 'created_at';
 
                 $sortOrder = $request->sort_order === 'asc' ? 'asc' : 'desc';
@@ -88,7 +88,7 @@ class CourseController extends Basecontroller
 
             $course->load(['lessons' => function($query) use ($user, $course) {
                 $query->orderBy('order');
-                
+
                 if ($user) {
                     if ($user->isSubscribedTo($course->id)) {
                         $query->where(function($q) use ($user) {
@@ -163,10 +163,10 @@ class CourseController extends Basecontroller
             if ($request->hasFile('image')) {
                 $image = $request->file('image');
                 $path = $image->store('courses', 'public');
-                
+
                 // $imageService = new ImageOptimizer();
                 // $imageService->optimize(storage_path('app/public/' . $path));
-                
+
                 $data['image'] = $path;
             } else {
                 $imageGenerator = new CourseImageGenerator();
@@ -237,10 +237,10 @@ class CourseController extends Basecontroller
 
                 $image = $request->file('image');
                 $path = $image->store('courses', 'public');
-                
+
                 // $imageService = new ImageOptimizer();
                 // $imageService->optimize(storage_path('app/public/' . $path));
-                
+
                 $data['image'] = $path;
             }
 

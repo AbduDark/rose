@@ -10,7 +10,7 @@ class RatingController extends Controller
 {
     public function index($courseId)
     {
-        $ratings = Rating::with('user:id,name')
+        $ratings = Rating::with('user:id,name,image')
             ->where('course_id', $courseId)
             ->orderBy('created_at', 'desc')
             ->get();
