@@ -204,9 +204,9 @@ class AuthController extends Controller
                 'role' => $user->role ?? 'student',
             ];
 
-            if ($user->image) {
-                $userData['image'] = $user->image;
-                $userData['image_url'] = url('storage/' . $user->image);
+            if ($user->profile_image) {
+                $userData['profile_image'] = $user->profile_image;
+                $userData['profile_image_url'] = url('storage/' . $user->profile_image);
             }
 
             return $this->successResponse([
@@ -377,16 +377,16 @@ class AuthController extends Controller
             $validator = Validator::make($request->all(), [
                 'name' => 'nullable|string|max:255',
                 'phone' => 'nullable|string|max:20|unique:users,phone,' . $user->id,
-                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+                'profile_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             ], [
                 'name.string' => 'الاسم يجب أن يكون نص|Name must be a string',
                 'name.max' => 'الاسم يجب ألا يزيد عن 255 حرف|Name must not exceed 255 characters',
                 'phone.string' => 'رقم الهاتف يجب أن يكون نص|Phone must be a string',
                 'phone.max' => 'رقم الهاتف يجب ألا يزيد عن 20 رقم|Phone number must not exceed 20 digits',
                 'phone.unique' => 'رقم الهاتف مستخدم بالفعل|Phone number already exists',
-                'image.image' => 'الملف المرفوع يجب أن يكون صورة|Uploaded file must be an image',
-                'image.mimes' => 'نوع الصورة يجب أن يكون jpeg, png, jpg, أو gif|Image must be jpeg, png, jpg, or gif',
-                'image.max' => 'حجم الصورة يجب ألا يزيد عن 2 ميجابايت|Image size must not exceed 2MB'
+                'profile_image.image' => 'الملف المرفوع يجب أن يكون صورة|Uploaded file must be an image',
+                'profile_image.mimes' => 'نوع الصورة يجب أن يكون jpeg, png, jpg, أو gif|Image must be jpeg, png, jpg, or gif',
+                'profile_image.max' => 'حجم الصورة يجب ألا يزيد عن 2 ميجابايت|Image size must not exceed 2MB'
             ]);
 
             if ($validator->fails()) {
@@ -394,25 +394,25 @@ class AuthController extends Controller
             }
 
             // Update image if provided
-            if ($request->hasFile('image')) {
+            if ($request->hasFile('profile_image')) {
                 // إنشاء مجلد profiles إذا لم يكن موجود
                 if (!Storage::disk('public')->exists('profiles')) {
                     Storage::disk('public')->makeDirectory('profiles');
                 }
 
                 // Delete old image if exists
-                if ($user->image && Storage::disk('public')->exists($user->image)) {
-                    Storage::disk('public')->delete($user->image);
+                if ($user->profile_image && Storage::disk('public')->exists($user->profile_image)) {
+                    Storage::disk('public')->delete($user->profile_image);
                 }
 
                 try {
-                    $image = $request->file('image');
-                    $imagePath = $image->store('profiles', 'public');
-                    $user->image = $imagePath;
+                    $profile_image = $request->file('profile_image');
+                    $profile_imagePath = $profile_image->store('profiles', 'public');
+                    $user->profile_image = $profile_imagePath;
 
                     Log::info('Profile image uploaded successfully', [
                         'user_id' => $user->id,
-                        'image_path' => $imagePath
+                        'profile_image_path' => $profile_imagePath
                     ]);
                 } catch (\Exception $e) {
                     Log::error('Failed to upload profile image', [
@@ -442,7 +442,7 @@ class AuthController extends Controller
                 $user->save();
                 Log::info('User profile updated successfully', [
                     'user_id' => $user->id,
-                    'updated_fields' => array_keys($request->only(['name', 'phone', 'image']))
+                    'updated_fields' => array_keys($request->only(['name', 'phone', 'profile_image']))
                 ]);
             } catch (\Exception $e) {
                 Log::error('Failed to save user profile', [
@@ -467,12 +467,12 @@ class AuthController extends Controller
                 'phone' => $user->phone,
                 'gender' => $user->gender,
                 'role' => $user->role ?? 'student',
-                'image' => $user->image,
+                'profile_image' => $user->profile_image,
             ];
 
             // إضافة URL كامل للصورة إذا وجدت
-            if ($user->image) {
-                $userData['image_url'] = url('storage/' . $user->image);
+            if ($user->profile_image) {
+                $userData['profile_image_url'] = url('storage/' . $user->profile_image);
             }
 
             return $this->successResponse([

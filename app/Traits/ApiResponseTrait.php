@@ -1,5 +1,5 @@
 <?php
-
+// app/Traits/ApiResponseTrait.php
 namespace App\Traits;
 
 use Illuminate\Http\JsonResponse;
@@ -34,7 +34,7 @@ trait ApiResponseTrait
     {
         $currentLanguage = app()->getLocale();
 
-        $errorMessage = is_array($message) 
+        $errorMessage = is_array($message)
             ? ($message[$currentLanguage] ?? $message['en'] ?? 'Error occurred')
             : $message;
 
