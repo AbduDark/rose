@@ -10,38 +10,21 @@ use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use App\Models\EmailVerification;
 use Illuminate\Support\Facades\Mail;
+use App\Mail\SendPinMail;
 use App\Mail\EmailVerificationMail;
-use App\Mail\PasswordResetMail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\URL;
 use Carbon\Carbon;
 use App\Traits\ApiResponseTrait;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Storage;
-use Symfony\Component\HttpFoundation\Response;
 
 class AuthController extends Controller
 {
-    use ApiResponseTrait;
-
-    // Constants for rate limiting
-    const MAX_LOGIN_ATTEMPTS = 10;
-    const LOGIN_DECAY_SECONDS = 900; // 15 minutes
-    const MAX_PASSWORD_RESET_ATTEMPTS = 3;
-    const PASSWORD_RESET_DECAY_SECONDS = 3600; // 1 hour
-    const MAX_VERIFICATION_RESEND_ATTEMPTS = 3;
-    const VERIFICATION_RESEND_DECAY_SECONDS = 3600; // 1 hour
-
-    /**
-     * Register a new user
-     */
     public function register(Request $request)
     {
-        DB::beginTransaction();
-
         try {
             $validator = Validator::make($request->all(), [
                 'name' => 'required|string|max:255',
@@ -50,13 +33,28 @@ class AuthController extends Controller
                 'phone' => 'required|string|max:20|unique:users',
                 'gender' => 'required|in:male,female'
             ], [
-                'password.regex' => 'كلمة المرور يجب أن تحتوي على حروف وأرقام|Password must contain letters and numbers'
+                'name.required' => 'الاسم مطلوب|Name is required',
+                'name.string' => 'الاسم يجب أن يكون نص|Name must be a string',
+                'name.max' => 'الاسم يجب ألا يزيد عن 255 حرف|Name must not exceed 255 characters',
+                'email.required' => 'البريد الإلكتروني مطلوب|Email is required',
+                'email.email' => 'البريد الإلكتروني غير صحيح|Invalid email format',
+                'email.unique' => 'البريد الإلكتروني مستخدم بالفعل|Email already exists',
+                'password.required' => 'كلمة المرور مطلوبة|Password is required',
+                'password.min' => 'كلمة المرور يجب ألا تقل عن 8 أحرف|Password must be at least 8 characters',
+                'password.confirmed' => 'تأكيد كلمة المرور غير مطابق|Password confirmation does not match',
+                'phone.required' => 'رقم الهاتف مطلوب|Phone number is required',
+                'phone.max' => 'رقم الهاتف يجب ألا يزيد عن 20 رقم|Phone number must not exceed 20 digits',
+                'phone.unique' => 'رقم الهاتف مستخدم بالفعل|Phone number already exists',
+                'gender.required' => 'الجنس مطلوب|Gender is required',
+                'gender.in' => 'الجنس يجب أن يكون ذكر أو أنثى|Gender must be male or female'
             ]);
 
             if ($validator->fails()) {
-                DB::rollBack();
                 return $this->validationErrorResponse(new ValidationException($validator));
             }
+
+            $pin = rand(100000, 999999);
+            $token = Str::random(60);
 
             $user = User::create([
                 'name' => $request->name,
@@ -64,83 +62,64 @@ class AuthController extends Controller
                 'password' => Hash::make($request->password),
                 'phone' => $request->phone,
                 'gender' => $request->gender,
-                'role' => 'student',
-                'email_verified_at' => null
+                'pin' => $pin,
+                'pin_expires_at' => Carbon::now()->addMinutes(10),
+                'email_verified_at' => null,
+                'role' => 'student'
             ]);
 
-            $token = Str::random(60);
-            $verification = EmailVerification::create([
+            // Create email verification record
+            EmailVerification::create([
                 'email' => $user->email,
                 'token' => $token,
                 'expires_at' => Carbon::now()->addHours(24)
             ]);
 
+            // Send verification email
             try {
                 $verificationUrl = url("/api/auth/verify-email?token={$token}");
                 Mail::to($user->email)->send(new EmailVerificationMail($verificationUrl));
-
-                DB::commit();
-
-                return $this->successResponse(
-                    [
-                        'user' => $user->only(['id', 'name', 'email', 'phone', 'gender', 'role']),
-                        'email_verification_required' => true
-                    ],
-                    [
-                        'ar' => 'تم التسجيل بنجاح. يرجى التحقق من بريدك الإلكتروني',
-                        'en' => 'Registration successful. Please verify your email'
-                    ],
-                    Response::HTTP_CREATED
-                );
-
             } catch (\Exception $e) {
-                DB::rollBack();
                 Log::error('Email sending failed: ' . $e->getMessage());
-
-                return $this->errorResponse(
-                    [
-                        'ar' => 'حدث خطأ في إرسال بريد التحقق',
-                        'en' => 'Failed to send verification email'
-                    ],
-                    Response::HTTP_INTERNAL_SERVER_ERROR,
-                    ['retry_possible' => true]
-                );
+                return $this->errorResponse([
+                    'ar' => 'حدث خطأ في إرسال بريد التحقق. يرجى المحاولة لاحقاً.',
+                    'en' => 'Failed to send verification email. Please try again later.'
+                ], 500);
             }
 
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Registration failed: ' . $e->getMessage());
+            return $this->successResponse([
+                'user' => $user->only(['id', 'name', 'email', 'phone', 'gender', 'role']),
+                'email_verification_required' => true
+            ], [
+                'ar' => 'تم تسجيل المستخدم بنجاح. يرجى التحقق من بريدك الإلكتروني للتحقق.',
+                'en' => 'User registered successfully. Please check your email for verification.'
+            ], 201);
 
-            return $this->serverErrorResponse(
-                'Failed to complete registration. Please try again later.',
-                Response::HTTP_INTERNAL_SERVER_ERROR
-            );
+        } catch (\Exception $e) {
+            Log::error('Registration failed: ' . $e->getMessage());
+            return $this->serverErrorResponse();
         }
     }
 
-    /**
-     * Authenticate user and generate token
-     */
     public function login(Request $request)
     {
         try {
             $key = 'login:' . $request->ip();
-
-            if (RateLimiter::tooManyAttempts($key, self::MAX_LOGIN_ATTEMPTS)) {
+            if (RateLimiter::tooManyAttempts($key, 10)) {
                 $seconds = RateLimiter::availableIn($key);
-                return $this->errorResponse(
-                    [
-                        'ar' => 'محاولات دخول كثيرة. حاول بعد ' . $seconds . ' ثانية',
-                        'en' => 'Too many attempts. Try again in ' . $seconds . ' seconds'
-                    ],
-                    Response::HTTP_TOO_MANY_REQUESTS,
-                    ['retry_after' => $seconds]
-                );
+                return $this->errorResponse([
+                    'ar' => 'محاولات دخول كثيرة جداً، حاول مرة أخرى خلال ' . $seconds . ' ثانية',
+                    'en' => 'Too many login attempts. Try again in ' . $seconds . ' seconds.'
+                ], 429);
             }
 
             $validator = Validator::make($request->all(), [
                 'email' => 'required|email',
                 'password' => 'required',
+            ], [
+                'email.required' => 'البريد الإلكتروني مطلوب|Email is required',
+                'email.email' => 'البريد الإلكتروني غير صحيح|Invalid email format',
+                'password.required' => 'كلمة المرور مطلوبة|Password is required',
             ]);
 
             if ($validator->fails()) {
@@ -150,53 +129,53 @@ class AuthController extends Controller
             $user = User::where('email', $request->email)->first();
 
             if (!$user || !Hash::check($request->password, $user->password)) {
-                RateLimiter::hit($key, self::LOGIN_DECAY_SECONDS);
+                RateLimiter::hit($key, 900);
 
                 Log::channel('security')->warning('Failed login attempt', [
                     'email' => $request->email,
-                    'ip' => $request->ip()
+                    'ip' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
                 ]);
 
-                return $this->errorResponse(
-                    [
-                        'ar' => 'بيانات الدخول غير صحيحة',
-                        'en' => 'Invalid credentials'
-                    ],
-                    Response::HTTP_UNAUTHORIZED
-                );
+                return $this->errorResponse([
+                    'ar' => 'بيانات الدخول غير صحيحة',
+                    'en' => 'Invalid credentials'
+                ], 401);
             }
 
+            // التحقق من تأكيد البريد الإلكتروني
             if (!$user->email_verified_at) {
-                return $this->errorResponse(
-                    [
-                        'ar' => 'يجب تأكيد البريد الإلكتروني أولاً',
-                        'en' => 'Email verification required'
-                    ],
-                    Response::HTTP_FORBIDDEN,
-                    [
-                        'email_verification_required' => true,
-                        'email' => $user->email
-                    ]
-                );
+                return $this->errorResponse([
+                    'ar' => 'يجب تأكيد البريد الإلكتروني أولاً',
+                    'en' => 'Email verification required'
+                ], 403, [
+                    'email_verification_required' => true,
+                    'email' => $user->email
+                ]);
             }
 
+            // Check if user is already logged in on another device
             $deviceFingerprint = $this->generateDeviceFingerprint($request);
 
-            if ($user->active_session_id && $user->device_fingerprint !== $deviceFingerprint) {
+            // Only check for multiple devices if user has an active session AND a stored device fingerprint
+            if ($user->active_session_id &&
+                $user->device_fingerprint &&
+                $user->device_fingerprint !== $deviceFingerprint &&
+                $user->last_login_at) {
+
+                // Revoke all existing tokens
                 $user->tokens()->delete();
 
                 Log::channel('security')->warning('Multiple device login attempt', [
                     'user_id' => $user->id,
-                    'ip' => $request->ip()
+                    'email' => $user->email,
+                    'ip' => $request->ip(),
                 ]);
 
-                return $this->errorResponse(
-                    [
-                        'ar' => 'مسجل دخول بالفعل على جهاز آخر',
-                        'en' => 'Already logged in on another device'
-                    ],
-                    Response::HTTP_FORBIDDEN
-                );
+                return $this->errorResponse([
+                    'ar' => 'أنت مسجل دخول على جهاز آخر، يرجى تسجيل الخروج من الجهاز الآخر أولاً',
+                    'en' => 'You are already logged in on another device. Please logout from that device first.'
+                ], 403);
             }
 
             $token = $user->createToken('auth_token')->plainTextToken;
@@ -208,26 +187,36 @@ class AuthController extends Controller
                 'last_login_at' => now(),
             ]);
 
-            RateLimiter::clear($key);
-
-            $userData = $this->prepareUserData($user);
-
             Log::channel('security')->info('User logged in', [
                 'user_id' => $user->id,
-                'ip' => $request->ip()
+                'email' => $user->email,
+                'ip' => $request->ip(),
             ]);
 
-            return $this->successResponse(
-                [
-                    'token' => $token,
-                    'session_id' => $sessionId,
-                    'user' => $userData
-                ],
-                [
-                    'ar' => 'تم تسجيل الدخول بنجاح',
-                    'en' => 'Login successful'
-                ]
-            );
+            RateLimiter::clear($key);
+
+            $userData = [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'gender' => $user->gender,
+                'role' => $user->role ?? 'student',
+            ];
+
+            if ($user->image) {
+                $userData['image'] = $user->image;
+                $userData['image_url'] = url('storage/' . $user->image);
+            }
+
+            return $this->successResponse([
+                'token' => $token,
+                'session_id' => $sessionId,
+                'user' => $userData
+            ], [
+                'ar' => 'تم تسجيل الدخول بنجاح',
+                'en' => 'Login successful'
+            ]);
 
         } catch (\Exception $e) {
             Log::error('Login error: ' . $e->getMessage());
@@ -235,156 +224,116 @@ class AuthController extends Controller
         }
     }
 
-    /**
-     * Get authenticated user profile
-     */
     public function profile(Request $request)
     {
-        try {
-            $user = $request->user();
-
-            if (!$user) {
-                return $this->errorResponse(
-                    [
-                        'ar' => 'غير مصرح',
-                        'en' => 'Unauthorized'
-                    ],
-                    Response::HTTP_UNAUTHORIZED
-                );
-            }
-
-            return $this->successResponse(
-                ['user' => $this->prepareUserData($user)],
-                [
-                    'ar' => 'تم جلب بيانات الملف الشخصي',
-                    'en' => 'Profile data retrieved'
-                ]
-            );
-
-        } catch (\Exception $e) {
-            Log::error('Profile error: ' . $e->getMessage());
-            return $this->serverErrorResponse();
-        }
+        return response()->json($request->user());
     }
 
-    /**
-     * Logout user (revoke current token)
-     */
-    public function logout(Request $request)
-    {
-        try {
-            $user = $request->user();
+   public function logout(Request $request)
+{
+    try {
+        $user = $request->user();
 
-            if (!$user) {
-                return $this->errorResponse(
-                    [
-                        'ar' => 'يجب تسجيل الدخول أولاً',
-                        'en' => 'You must be logged in'
-                    ],
-                    Response::HTTP_UNAUTHORIZED
-                );
-            }
+        if (!$user) {
+            return $this->errorResponse([
+                'ar' => 'يجب تسجيل الدخول أولاً',
+                'en' => 'You must be logged in to perform this action'
+            ], 401);
+        }
 
-            // Revoke current token
-            if (method_exists($user, 'currentAccessToken')) {
-                $user->currentAccessToken()->delete();
-            } else {
-                $request->user()->token()->revoke();
-            }
+        // تسجيل معلومات تسجيل الخروج
+        Log::info('User logout', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent()
+        ]);
 
-            // Clear session
+        // حل المشكلة المحتملة مع Sanctum
+        if (method_exists($user, 'currentAccessToken')) {
+            // إلغاء التوكن الحالي فقط (لـ Sanctum)
+            $user->currentAccessToken()->delete();
+        } else {
+            // حل بديل إذا كان هناك مشكلة مع currentAccessToken()
+            $request->user()->token()->revoke();
+        }
+
+        // مسح بيانات الجلسة إذا كنت تستخدمها
+        if ($user->active_session_id) {
             $user->update(['active_session_id' => null]);
-
-            Log::info('User logged out', [
-                'user_id' => $user->id,
-                'ip' => $request->ip()
-            ]);
-
-            return $this->successResponse(
-                [],
-                [
-                    'ar' => 'تم تسجيل الخروج بنجاح',
-                    'en' => 'Logged out successfully'
-                ]
-            );
-
-        } catch (\Exception $e) {
-            Log::error('Logout error: ' . $e->getMessage());
-            return $this->serverErrorResponse();
         }
+
+        return $this->successResponse([], [
+            'ar' => 'تم تسجيل الخروج بنجاح',
+            'en' => 'Logged out successfully'
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('Logout error for user ' . ($request->user()?->id ?? 'unknown') . ': ' . $e->getMessage(), [
+            'exception' => $e,
+            'ip' => $request->ip()
+        ]);
+        return $this->serverErrorResponse();
     }
+}
 
-    /**
-     * Force logout from all devices
-     */
-    public function forceLogout(Request $request)
-    {
-        try {
-            $user = $request->user();
+  public function forceLogout(Request $request)
+{
+    try {
+        $user = $request->user();
 
-            if (!$user) {
-                return $this->errorResponse(
-                    [
-                        'ar' => 'يجب تسجيل الدخول أولاً',
-                        'en' => 'You must be logged in'
-                    ],
-                    Response::HTTP_UNAUTHORIZED
-                );
-            }
-
-            $validator = Validator::make($request->all(), [
-                'email' => 'required|email|exists:users,email'
-            ]);
-
-            if ($validator->fails()) {
-                return $this->validationErrorResponse(new ValidationException($validator));
-            }
-
-            if ($user->email !== $request->email) {
-                return $this->errorResponse(
-                    [
-                        'ar' => 'غير مصرح بهذا الإجراء',
-                        'en' => 'Unauthorized action'
-                    ],
-                    Response::HTTP_FORBIDDEN
-                );
-            }
-
-            // Revoke all tokens
-            $user->tokens()->delete();
-
-            // Clear all sessions
-            $user->update([
-                'active_session_id' => null,
-                'device_fingerprint' => null,
-            ]);
-
-            Log::channel('security')->info('Force logout performed', [
-                'user_id' => $user->id,
-                'ip' => $request->ip()
-            ]);
-
-            return $this->successResponse(
-                [],
-                [
-                    'ar' => 'تم تسجيل الخروج من جميع الأجهزة',
-                    'en' => 'Logged out from all devices'
-                ]
-            );
-
-        } catch (\Exception $e) {
-            Log::error('Force logout error: ' . $e->getMessage());
-            return $this->serverErrorResponse();
+        // التحقق من وجود التوكن والمستخدم
+        if (!$user || !$request->bearerToken()) {
+            return $this->errorResponse([
+                'ar' => 'يجب تسجيل الدخول أولاً',
+                'en' => 'You must be logged in to perform this action'
+            ], 401);
         }
-    }
 
-    /**
-     * Change user password
-     */
+        $request->validate([
+            'email' => 'required|email|exists:users,email',
+        ]);
+
+        // التحقق من أن المستخدم يحاول تسجيل خروج نفسه فقط
+        if ($user->email !== $request->email) {
+            return $this->errorResponse([
+                'ar' => 'غير مصرح لك بتسجيل خروج مستخدم آخر',
+                'en' => 'You are not authorized to logout another user'
+            ], 403);
+        }
+
+        // Force logout from all devices
+        $user->tokens()->delete();
+        $user->update([
+            'active_session_id' => null,
+            'device_fingerprint' => null,
+        ]);
+
+        Log::channel('security')->info('Force logout performed', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent()
+        ]);
+
+        return $this->successResponse([], [
+            'ar' => 'تم تسجيل الخروج من جميع الأجهزة بنجاح',
+            'en' => 'Successfully logged out from all devices'
+        ]);
+
+    } catch (\Exception $e) {
+        Log::channel('security')->error('Force logout error for user ' . ($user->id ?? 'unknown') . ': ' . $e->getMessage(), [
+            'exception' => $e,
+            'ip' => $request->ip()
+        ]);
+        return $this->serverErrorResponse();
+    }
+}
+
     public function changePassword(Request $request)
     {
         try {
-            $validator = Validator::make($request->all(), [
+            $request->validate([
                 'current_password' => 'required|string',
                 'new_password' => [
                     'required',
@@ -395,51 +344,33 @@ class AuthController extends Controller
                 ]
             ]);
 
-            if ($validator->fails()) {
-                return $this->validationErrorResponse(new ValidationException($validator));
-            }
-
             $user = $request->user();
 
             if (!Hash::check($request->current_password, $user->password)) {
-                return $this->errorResponse(
-                    [
-                        'ar' => 'كلمة المرور الحالية غير صحيحة',
-                        'en' => 'Current password is incorrect'
-                    ],
-                    Response::HTTP_UNPROCESSABLE_ENTITY
-                );
+                return $this->errorResponse([
+                    'ar' => 'كلمة المرور الحالية غير صحيحة',
+                    'en' => 'Current password is incorrect'
+                ], 422);
             }
 
-            $user->update(['password' => Hash::make($request->new_password)]);
+            $user->update([
+                'password' => Hash::make($request->new_password)
+            ]);
 
-            // Logout from all devices after password change
-            $user->tokens()->delete();
-            $user->update(['active_session_id' => null]);
+            return $this->successResponse([], [
+                'ar' => 'تم تغيير كلمة المرور بنجاح',
+                'en' => 'Password changed successfully'
+            ]);
 
-            Log::info('Password changed', ['user_id' => $user->id]);
-
-            return $this->successResponse(
-                [],
-                [
-                    'ar' => 'تم تغيير كلمة المرور بنجاح',
-                    'en' => 'Password changed successfully'
-                ]
-            );
-
+        } catch (ValidationException $e) {
+            return $this->validationErrorResponse($e);
         } catch (\Exception $e) {
-            Log::error('Password change error: ' . $e->getMessage());
             return $this->serverErrorResponse();
         }
     }
 
-    /**
-     * Update user profile
-     */
     public function updateProfile(Request $request)
     {
-        DB::beginTransaction();
-
         try {
             $user = $request->user();
 
@@ -447,93 +378,148 @@ class AuthController extends Controller
                 'name' => 'nullable|string|max:255',
                 'phone' => 'nullable|string|max:20|unique:users,phone,' . $user->id,
                 'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            ], [
+                'name.string' => 'الاسم يجب أن يكون نص|Name must be a string',
+                'name.max' => 'الاسم يجب ألا يزيد عن 255 حرف|Name must not exceed 255 characters',
+                'phone.string' => 'رقم الهاتف يجب أن يكون نص|Phone must be a string',
+                'phone.max' => 'رقم الهاتف يجب ألا يزيد عن 20 رقم|Phone number must not exceed 20 digits',
+                'phone.unique' => 'رقم الهاتف مستخدم بالفعل|Phone number already exists',
+                'image.image' => 'الملف المرفوع يجب أن يكون صورة|Uploaded file must be an image',
+                'image.mimes' => 'نوع الصورة يجب أن يكون jpeg, png, jpg, أو gif|Image must be jpeg, png, jpg, or gif',
+                'image.max' => 'حجم الصورة يجب ألا يزيد عن 2 ميجابايت|Image size must not exceed 2MB'
             ]);
 
             if ($validator->fails()) {
-                DB::rollBack();
                 return $this->validationErrorResponse(new ValidationException($validator));
             }
 
-            // Handle image upload
+            // Update image if provided
             if ($request->hasFile('image')) {
-                try {
-                    $this->handleProfileImageUpload($user, $request->file('image'));
-                } catch (\Exception $e) {
-                    DB::rollBack();
-                    Log::error('Image upload failed: ' . $e->getMessage());
+                // إنشاء مجلد profiles إذا لم يكن موجود
+                if (!Storage::disk('public')->exists('profiles')) {
+                    Storage::disk('public')->makeDirectory('profiles');
+                }
 
-                    return $this->errorResponse(
-                        [
-                            'ar' => 'فشل في رفع الصورة',
-                            'en' => 'Failed to upload image'
-                        ],
-                        Response::HTTP_INTERNAL_SERVER_ERROR
-                    );
+                // Delete old image if exists
+                if ($user->image && Storage::disk('public')->exists($user->image)) {
+                    Storage::disk('public')->delete($user->image);
+                }
+
+                try {
+                    $image = $request->file('image');
+                    $imagePath = $image->store('profiles', 'public');
+                    $user->image = $imagePath;
+
+                    Log::info('Profile image uploaded successfully', [
+                        'user_id' => $user->id,
+                        'image_path' => $imagePath
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error('Failed to upload profile image', [
+                        'user_id' => $user->id,
+                        'error' => $e->getMessage()
+                    ]);
+
+                    return $this->errorResponse([
+                        'ar' => 'فشل في رفع الصورة، يرجى المحاولة مرة أخرى',
+                        'en' => 'Failed to upload image, please try again'
+                    ], 500);
                 }
             }
 
-            // Update other fields
-            $user->fill($request->only(['name', 'phone']));
-
-            if (!$user->save()) {
-                DB::rollBack();
-                return $this->errorResponse(
-                    [
-                        'ar' => 'فشل في حفظ التغييرات',
-                        'en' => 'Failed to save changes'
-                    ],
-                    Response::HTTP_INTERNAL_SERVER_ERROR
-                );
+            // Update name if provided
+            if ($request->filled('name')) {
+                $user->name = $request->name;
             }
 
-            DB::commit();
+            // Update phone if provided
+            if ($request->filled('phone')) {
+                $user->phone = $request->phone;
+            }
 
-            return $this->successResponse(
-                ['user' => $this->prepareUserData($user)],
-                [
-                    'ar' => 'تم تحديث الملف الشخصي',
-                    'en' => 'Profile updated'
-                ]
-            );
+            // حفظ التحديثات
+            try {
+                $user->save();
+                Log::info('User profile updated successfully', [
+                    'user_id' => $user->id,
+                    'updated_fields' => array_keys($request->only(['name', 'phone', 'image']))
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Failed to save user profile', [
+                    'user_id' => $user->id,
+                    'error' => $e->getMessage()
+                ]);
+
+                return $this->errorResponse([
+                    'ar' => 'فشل في حفظ التحديثات',
+                    'en' => 'Failed to save updates'
+                ], 500);
+            }
+
+            // إعادة تحميل البيانات من قاعدة البيانات
+            $user->refresh();
+
+            // إعداد بيانات المستخدم للإرجاع
+            $userData = [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'gender' => $user->gender,
+                'role' => $user->role ?? 'student',
+                'image' => $user->image,
+            ];
+
+            // إضافة URL كامل للصورة إذا وجدت
+            if ($user->image) {
+                $userData['image_url'] = url('storage/' . $user->image);
+            }
+
+            return $this->successResponse([
+                'user' => $userData
+            ], [
+                'ar' => 'تم تحديث الملف الشخصي بنجاح',
+                'en' => 'Profile updated successfully'
+            ]);
 
         } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Profile update error: ' . $e->getMessage());
+            Log::error('Profile update error: ' . $e->getMessage(), [
+                'user_id' => $request->user()?->id,
+                'trace' => $e->getTraceAsString()
+            ]);
             return $this->serverErrorResponse();
         }
     }
 
-    /**
-     * Handle forgot password request
-     */
-    public function forgotPassword(Request $request)
+   public function forgotPassword(Request $request)
     {
         try {
-            $key = 'password_reset:' . $request->email;
-
-            if (RateLimiter::tooManyAttempts($key, self::MAX_PASSWORD_RESET_ATTEMPTS)) {
-                $seconds = RateLimiter::availableIn($key);
-                return $this->errorResponse(
-                    [
-                        'ar' => 'محاولات كثيرة. حاول بعد ' . ceil($seconds/60) . ' دقيقة',
-                        'en' => 'Too many attempts. Try again in ' . ceil($seconds/60) . ' minutes'
-                    ],
-                    Response::HTTP_TOO_MANY_REQUESTS,
-                    ['retry_after' => $seconds]
-                );
-            }
-
             $validator = Validator::make($request->all(), [
                 'email' => 'required|email|exists:users,email'
+            ], [
+                'email.required' => 'البريد الإلكتروني مطلوب|Email is required',
+                'email.email' => 'البريد الإلكتروني غير صحيح|Invalid email format',
+                'email.exists' => 'البريد الإلكتروني غير مسجل لدينا|Email not found in our records'
             ]);
 
             if ($validator->fails()) {
                 return $this->validationErrorResponse(new ValidationException($validator));
+            }
+
+            // التحقق من Rate Limiting
+            $key = 'password_reset:' . $request->email;
+            if (RateLimiter::tooManyAttempts($key, 3)) {
+                $seconds = RateLimiter::availableIn($key);
+                return $this->errorResponse([
+                    'ar' => 'محاولات كثيرة جداً. حاول مرة أخرى خلال ' . ceil($seconds/60) . ' دقيقة',
+                    'en' => 'Too many attempts. Try again in ' . ceil($seconds/60) . ' minutes.'
+                ], 429);
             }
 
             $user = User::where('email', $request->email)->first();
             $token = Str::random(64);
 
+            // حفظ رمز إعادة التعيين
             EmailVerification::updateOrCreate(
                 ['email' => $request->email],
                 [
@@ -543,54 +529,66 @@ class AuthController extends Controller
             );
 
             try {
+                // إرسال بريد إعادة التعيين
                 $resetUrl = url("/api/auth/reset-password?token={$token}&email=" . urlencode($request->email));
-                Mail::to($request->email)->send(new PasswordResetMail($resetUrl, $user));
+                Mail::to($request->email)->send(new \App\Mail\PasswordResetMail($resetUrl, $user));
 
-                RateLimiter::hit($key, self::PASSWORD_RESET_DECAY_SECONDS);
-
+                // تسجيل نجاح العملية
                 Log::channel('security')->info('Password reset requested', [
                     'email' => $request->email,
-                    'ip' => $request->ip()
+                    'ip' => $request->ip(),
+                    'user_agent' => $request->userAgent()
                 ]);
 
-                return $this->successResponse(
-                    [],
-                    [
-                        'ar' => 'تم إرسال رابط إعادة التعيين',
-                        'en' => 'Reset link has been sent'
-                    ]
-                );
+                RateLimiter::hit($key, 3600); // منع المحاولات لمدة ساعة
+
+                return $this->successResponse([], [
+                    'ar' => 'تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني',
+                    'en' => 'Password reset link has been sent to your email'
+                ]);
 
             } catch (\Exception $e) {
-                Log::error('Failed to send reset email: ' . $e->getMessage());
-                return $this->errorResponse(
-                    [
-                        'ar' => 'فشل في إرسال البريد',
-                        'en' => 'Failed to send email'
-                    ],
-                    Response::HTTP_INTERNAL_SERVER_ERROR,
-                    ['retry_possible' => true]
-                );
+                Log::error('Failed to send password reset email', [
+                    'email' => $request->email,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+
+                return $this->errorResponse([
+                    'ar' => 'فشل في إرسال البريد الإلكتروني. يرجى المحاولة لاحقاً',
+                    'en' => 'Failed to send email. Please try again later'
+                ], 500);
             }
 
         } catch (\Exception $e) {
-            Log::error('Forgot password error: ' . $e->getMessage());
+            Log::error('Forgot password error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return $this->serverErrorResponse();
         }
     }
 
-    /**
-     * Verify email address
-     */
+    private function generateDeviceFingerprint(Request $request)
+    {
+        $data = [
+            'user_agent' => $request->userAgent(),
+            'ip' => $request->ip(),
+            'accept_language' => $request->header('Accept-Language'),
+            'accept_encoding' => $request->header('Accept-Encoding'),
+        ];
+
+        return hash('sha256', json_encode($data));
+    }
+
     public function verifyEmail(Request $request)
     {
         DB::beginTransaction();
-
         try {
             $token = $request->query('token');
 
             if (!$token) {
-                throw new \Exception('Missing verification token');
+                throw new \Exception('رابط التحقق غير صالح');
             }
 
             $verification = EmailVerification::where('token', $token)
@@ -598,40 +596,55 @@ class AuthController extends Controller
                 ->first();
 
             if (!$verification) {
-                throw new \Exception('Invalid or expired token');
+                throw new \Exception('رابط التحقق غير صالح أو منتهي الصلاحية');
             }
 
             $user = User::where('email', $verification->email)->first();
 
             if (!$user) {
-                throw new \Exception('User not found');
+                throw new \Exception('المستخدم غير موجود');
             }
 
+            // تحديث حالة التحقق من البريد
             $user->email_verified_at = now();
             $user->save();
+
+            // حذف سجل التحقق بعد نجاح التحقق
             $verification->delete();
 
             DB::commit();
 
-            Log::info('Email verified', ['user_id' => $user->id]);
+            // تسجيل العملية
+            Log::channel('security')->info('Email verified successfully', [
+                'user_id' => $user->id,
+                'email' => $user->email
+            ]);
 
+            // إعادة توجيه إلى صفحة النجاح
             return redirect('/email-verified?success=true');
 
         } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Email verification error: ' . $e->getMessage());
+            DB::rollback();
+
+            Log::channel('security')->error('Error verifying email', [
+                'error' => $e->getMessage(),
+                'email' => $verification->email ?? 'unknown',
+                'token' => $token
+            ]);
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 400);
+            }
 
             return redirect('/email-verified?error=' . urlencode($e->getMessage()));
         }
     }
 
-    /**
-     * Reset password
-     */
-    public function resetPassword(Request $request)
+   public function resetPassword(Request $request)
     {
-        DB::beginTransaction();
-
         try {
             $validator = Validator::make($request->all(), [
                 'token' => 'required|string',
@@ -643,93 +656,86 @@ class AuthController extends Controller
                     'confirmed',
                     'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/'
                 ]
+            ], [
+                'token.required' => 'رمز التحقق مطلوب|Reset token is required',
+                'email.required' => 'البريد الإلكتروني مطلوب|Email is required',
+                'email.email' => 'البريد الإلكتروني غير صحيح|Invalid email format',
+                'password.required' => 'كلمة المرور مطلوبة|Password is required',
+                'password.min' => 'كلمة المرور يجب ألا تقل عن 8 أحرف|Password must be at least 8 characters',
+                'password.confirmed' => 'تأكيد كلمة المرور غير متطابق|Password confirmation does not match',
+                'password.regex' => 'كلمة المرور يجب أن تحتوي على حرف كبير وصغير ورقم ورمز خاص|Password must contain uppercase, lowercase, number and special character'
             ]);
 
             if ($validator->fails()) {
-                DB::rollBack();
                 return $this->validationErrorResponse(new ValidationException($validator));
             }
 
+            // التحقق من صحة الرمز
             $verification = EmailVerification::where('token', $request->token)
                 ->where('email', $request->email)
                 ->where('expires_at', '>', now())
                 ->first();
 
             if (!$verification) {
-                DB::rollBack();
-                return $this->errorResponse(
-                    [
-                        'ar' => 'رابط إعادة التعيين غير صالح',
-                        'en' => 'Invalid reset link'
-                    ],
-                    Response::HTTP_UNPROCESSABLE_ENTITY
-                );
+                return $this->errorResponse([
+                    'ar' => 'رمز إعادة التعيين غير صالح أو منتهي الصلاحية',
+                    'en' => 'Invalid or expired reset token'
+                ], 422);
             }
 
+            // العثور على المستخدم
             $user = User::where('email', $request->email)->first();
 
             if (!$user) {
-                DB::rollBack();
-                return $this->errorResponse(
-                    [
-                        'ar' => 'المستخدم غير موجود',
-                        'en' => 'User not found'
-                    ],
-                    Response::HTTP_NOT_FOUND
-                );
+                return $this->errorResponse([
+                    'ar' => 'المستخدم غير موجود',
+                    'en' => 'User not found'
+                ], 404);
             }
 
+            // تحديث كلمة المرور
             $user->password = Hash::make($request->password);
+
+            // فرض تسجيل الخروج من جميع الأجهزة
             $user->tokens()->delete();
             $user->active_session_id = null;
             $user->device_fingerprint = null;
             $user->save();
+
+            // حذف رمز إعادة التعيين
             $verification->delete();
 
-            DB::commit();
-
-            Log::channel('security')->info('Password reset completed', [
+            // تسجيل العملية
+            Log::channel('security')->info('Password reset completed successfully', [
                 'user_id' => $user->id,
-                'ip' => $request->ip()
+                'email' => $user->email,
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent()
             ]);
 
-            return $this->successResponse(
-                [],
-                [
-                    'ar' => 'تم إعادة تعيين كلمة المرور',
-                    'en' => 'Password has been reset'
-                ]
-            );
+            return $this->successResponse([], [
+                'ar' => 'تم تغيير كلمة المرور بنجاح. يرجى تسجيل الدخول مرة أخرى',
+                'en' => 'Password has been reset successfully. Please login again'
+            ]);
 
         } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Password reset error: ' . $e->getMessage());
+            Log::error('Password reset error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return $this->serverErrorResponse();
         }
     }
 
-    /**
-     * Resend verification email
-     */
-    public function resendVerification(Request $request)
+ public function resendVerification(Request $request)
     {
         try {
-            $key = 'resend_verification:' . $request->email;
-
-            if (RateLimiter::tooManyAttempts($key, self::MAX_VERIFICATION_RESEND_ATTEMPTS)) {
-                $seconds = RateLimiter::availableIn($key);
-                return $this->errorResponse(
-                    [
-                        'ar' => 'محاولات كثيرة. حاول بعد ' . ceil($seconds/60) . ' دقيقة',
-                        'en' => 'Too many attempts. Try again in ' . ceil($seconds/60) . ' minutes'
-                    ],
-                    Response::HTTP_TOO_MANY_REQUESTS,
-                    ['retry_after' => $seconds]
-                );
-            }
-
             $validator = Validator::make($request->all(), [
                 'email' => 'required|email|exists:users,email'
+            ], [
+                'email.required' => 'البريد الإلكتروني مطلوب|Email is required',
+                'email.email' => 'البريد الإلكتروني غير صحيح|Invalid email format',
+                'email.exists' => 'البريد الإلكتروني غير مسجل|Email not found'
             ]);
 
             if ($validator->fails()) {
@@ -739,13 +745,20 @@ class AuthController extends Controller
             $user = User::where('email', $request->email)->first();
 
             if ($user->email_verified_at) {
-                return $this->errorResponse(
-                    [
-                        'ar' => 'البريد مفعل بالفعل',
-                        'en' => 'Email already verified'
-                    ],
-                    Response::HTTP_UNPROCESSABLE_ENTITY
-                );
+                return $this->errorResponse([
+                    'ar' => 'البريد الإلكتروني مُفعل بالفعل',
+                    'en' => 'Email already verified'
+                ], 422);
+            }
+
+            // التحقق من Rate Limiting
+            $key = 'resend_verification:' . $request->email;
+            if (RateLimiter::tooManyAttempts($key, 3)) {
+                $seconds = RateLimiter::availableIn($key);
+                return $this->errorResponse([
+                    'ar' => 'محاولات كثيرة جداً. حاول مرة أخرى خلال ' . ceil($seconds/60) . ' دقيقة',
+                    'en' => 'Too many attempts. Try again in ' . ceil($seconds/60) . ' minutes.'
+                ], 429);
             }
 
             $token = Str::random(60);
@@ -761,100 +774,90 @@ class AuthController extends Controller
                 $verificationUrl = url("/api/auth/verify-email?token={$token}");
                 Mail::to($request->email)->send(new EmailVerificationMail($verificationUrl));
 
-                RateLimiter::hit($key, self::VERIFICATION_RESEND_DECAY_SECONDS);
+                RateLimiter::hit($key, 3600);
 
-                Log::info('Verification email resent', ['email' => $request->email]);
+                Log::channel('security')->info('Email verification link resent', [
+                    'email' => $request->email,
+                    'ip' => $request->ip(),
+                ]);
 
-                return $this->successResponse(
-                    [],
-                    [
-                        'ar' => 'تم إعادة إرسال بريد التحقق',
-                        'en' => 'Verification email resent'
-                    ]
-                );
+                return $this->successResponse([], [
+                    'ar' => 'تم إعادة إرسال رابط التحقق. يرجى فحص بريدك الإلكتروني',
+                    'en' => 'Verification link has been resent. Please check your email.'
+                ]);
 
             } catch (\Exception $e) {
-                Log::error('Failed to resend verification: ' . $e->getMessage());
-                return $this->errorResponse(
-                    [
-                        'ar' => 'فشل في إرسال البريد',
-                        'en' => 'Failed to send email'
-                    ],
-                    Response::HTTP_INTERNAL_SERVER_ERROR,
-                    ['retry_possible' => true]
-                );
+                Log::error('Failed to resend verification email', [
+                    'email' => $request->email,
+                    'error' => $e->getMessage()
+                ]);
+
+                return $this->errorResponse([
+                    'ar' => 'فشل في إرسال البريد الإلكتروني',
+                    'en' => 'Failed to send email'
+                ], 500);
             }
 
         } catch (\Exception $e) {
-            Log::error('Resend verification error: ' . $e->getMessage());
+            Log::error('Resend verification error', [
+                'error' => $e->getMessage()
+            ]);
             return $this->serverErrorResponse();
         }
     }
 
-    /**
-     * Generate device fingerprint
-     */
-    private function generateDeviceFingerprint(Request $request): string
+    protected function validationErrorResponse(ValidationException $exception)
     {
-        $data = [
-            'user_agent' => $request->userAgent(),
-            'ip' => $request->ip(),
-            'accept_language' => $request->header('Accept-Language'),
-            'accept_encoding' => $request->header('Accept-Encoding'),
-        ];
+        $errors = $exception->errors();
 
-        return hash('sha256', json_encode($data));
-    }
-
-    /**
-     * Prepare user data for response
-     */
-    private function prepareUserData(User $user): array
-{
-    $data = [
-        'id' => $user->id,
-        'name' => $user->name,
-        'email' => $user->email,
-        'phone' => $user->phone,
-        'gender' => $user->gender,
-        'role' => $user->role ?? 'student',
-    ];
-
-    if ($user->image) {
-        $data['image'] = $user->image;
-       $data['image_url'] = asset('storage/' . $user->image);
-    }
-
-    return $data;
-}
-
-protected function serverErrorResponse(string $message = 'An unexpected error occurred on the server.', int $status = 500)
-{
-    return response()->json([
-        'success' => false,
-        'message' => [
-            'ar' => 'حدث خطأ غير متوقع في الخادم.',
-            'en' => $message,
-        ],
-    ], $status);
-}
-
-    /**
-     * Handle profile image upload
-     */
-    private function handleProfileImageUpload(User $user, $image): void
-    {
-        if (!Storage::disk('public')->exists('profiles')) {
-            Storage::disk('public')->makeDirectory('profiles');
+        $formattedErrors = [];
+        foreach ($errors as $field => $messages) {
+            $formattedErrors[$field] = [
+                'ar' => $messages[0] ?? 'خطأ في التحقق',
+                'en' => $messages[0] ?? 'Validation error',
+            ];
+            if (count($messages) > 1) {
+                $formattedErrors[$field]['en'] .= ' (and ' . (count($messages) - 1) . ' more)';
+                $formattedErrors[$field]['ar'] .= ' (و ' . (count($messages) - 1) . ' المزيد)';
+            }
         }
 
-        // Delete old image if exists
-        if ($user->image && Storage::disk('public')->exists($user->image)) {
-            Storage::disk('public')->delete($user->image);
-        }
+        return response()->json([
+            'success' => false,
+            'message' => [
+                'ar' => 'فشل التحقق من البيانات',
+                'en' => 'The given data failed to validate',
+            ],
+            'errors' => $formattedErrors,
+        ], 422);
+    }
 
-        $imagePath = $image->store('profiles', 'public');
-        $user->image = $imagePath;
-        $user->save();
+    protected function successResponse(array $data = [], array $messages = ['en' => 'Success'], int $status = 200)
+    {
+        return response()->json([
+            'success' => true,
+            'message' => $messages,
+            'data' => $data,
+        ], $status);
+    }
+
+    protected function serverErrorResponse(string $message = 'An unexpected error occurred on the server.')
+    {
+        return response()->json([
+            'success' => false,
+            'message' => [
+                'ar' => 'حدث خطأ غير متوقع في الخادم.',
+                'en' => $message,
+            ],
+        ], 500);
+    }
+
+    protected function errorResponse(array $messages, int $status = 400, array $data = [])
+    {
+        return response()->json([
+            'success' => false,
+            'message' => $messages,
+            'data' => $data
+        ], $status);
     }
 }
