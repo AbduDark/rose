@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Carbon\Carbon;
+use Auth;
 
 class AdminController extends Controller
 {
@@ -200,10 +201,8 @@ class AdminController extends Controller
                 'active_courses' => Course::where('is_active', true)->count(),
                 'total_subscriptions' => Subscription::count(),
                 'active_subscriptions' => Subscription::where('is_active', true)->count(),
-                'total_payments' => Payment::count(),
-                'total_revenue' => Payment::where('status', 'paid')->sum('amount'),
-                'verified_users' => User::whereNotNull('email_verified_at')->count(),
-                'unverified_users' => User::whereNull('email_verified_at')->count(),
+                'approved_subscriptions' => Subscription::where('is_approved', true)->count(),
+                'pending_subscriptions' => Subscription::where('is_approved', false)->count(),
             ];
 
             // إحصائيات شهرية
@@ -214,10 +213,6 @@ class AdminController extends Controller
                 'new_subscriptions_this_month' => Subscription::whereMonth('created_at', Carbon::now()->month)
                                                              ->whereYear('created_at', Carbon::now()->year)
                                                              ->count(),
-                'revenue_this_month' => Payment::where('status', 'paid')
-                                              ->whereMonth('created_at', Carbon::now()->month)
-                                              ->whereYear('created_at', Carbon::now()->year)
-                                              ->sum('amount'),
             ];
 
             return $this->successResponse([
@@ -285,7 +280,7 @@ class AdminController extends Controller
     {
         try {
             $subscription = Subscription::findOrFail($id);
-            
+
             if ($subscription->status !== 'pending') {
                 return $this->errorResponse([
                     'ar' => 'هذا الطلب تم التعامل معه مسبقاً',
@@ -327,7 +322,7 @@ class AdminController extends Controller
             }
 
             $subscription = Subscription::findOrFail($id);
-            
+
             if ($subscription->status !== 'pending') {
                 return $this->errorResponse([
                     'ar' => 'هذا الطلب تم التعامل معه مسبقاً',
@@ -375,68 +370,8 @@ class AdminController extends Controller
             Log::error('Admin get pending comments error: ' . $e->getMessage());
             return $this->serverErrorResponse();
         }
-    }rieved successfully'
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Admin get subscriptions error: ' . $e->getMessage());
-            return $this->serverErrorResponse();
-        }
     }
 
-    public function approveSubscription($id)
-    {
-        try {
-            $subscription = Subscription::findOrFail($id);
-
-            $subscription->update([
-                'is_approved' => true,
-                'is_active' => true,
-                'approved_at' => now()
-            ]);
-
-            return $this->successResponse($subscription, [
-                'ar' => 'تم قبول الاشتراك بنجاح',
-                'en' => 'Subscription approved successfully'
-            ]);
-
-        } catch (ModelNotFoundException $e) {
-            return $this->errorResponse([
-                'ar' => 'الاشتراك غير موجود',
-                'en' => 'Subscription not found'
-            ], 404);
-        } catch (\Exception $e) {
-            Log::error('Admin approve subscription error: ' . $e->getMessage());
-            return $this->serverErrorResponse();
-        }
-    }
-
-    public function rejectSubscription($id)
-    {
-        try {
-            $subscription = Subscription::findOrFail($id);
-
-            $subscription->update([
-                'is_approved' => false,
-                'is_active' => false,
-                'rejected_at' => now()
-            ]);
-
-            return $this->successResponse($subscription, [
-                'ar' => 'تم رفض الاشتراك',
-                'en' => 'Subscription rejected'
-            ]);
-
-        } catch (ModelNotFoundException $e) {
-            return $this->errorResponse([
-                'ar' => 'الاشتراك غير موجود',
-                'en' => 'Subscription not found'
-            ], 404);
-        } catch (\Exception $e) {
-            Log::error('Admin reject subscription error: ' . $e->getMessage());
-            return $this->serverErrorResponse();
-        }
-    }
 
     // إدارة الدروس
     public function createLesson(Request $request)

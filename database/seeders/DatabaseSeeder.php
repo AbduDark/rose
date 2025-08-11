@@ -168,7 +168,6 @@ class DatabaseSeeder extends Seeder
         }
 
         $this->call([
-            PaymentSeeder::class,
             LargeCourseSeeder::class,
         ]);
     }

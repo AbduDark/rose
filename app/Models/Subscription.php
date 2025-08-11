@@ -1,4 +1,3 @@
-
 <?php
 
 namespace App\Models;
@@ -13,7 +12,6 @@ class Subscription extends Model
     protected $fillable = [
         'user_id',
         'course_id',
-        'payment_id',
         'vodafone_number',
         'parent_phone',
         'student_info',

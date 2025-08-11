@@ -1,4 +1,3 @@
-
 <?php
 
 namespace App\Http\Controllers\Api;
@@ -44,7 +43,7 @@ class SubscriptionController extends Controller
                         'en' => 'You already have a pending subscription request'
                     ], 400);
                 }
-                
+
                 if ($existingSubscription->status === 'approved' && $existingSubscription->is_active) {
                     return $this->errorResponse([
                         'ar' => 'أنت مشترك بالفعل في هذا الكورس',
@@ -102,7 +101,7 @@ class SubscriptionController extends Controller
     {
         try {
             $subscription = Subscription::findOrFail($id);
-            
+
             if ($subscription->status !== 'pending') {
                 return $this->errorResponse([
                     'ar' => 'هذا الطلب تم التعامل معه مسبقاً',
@@ -143,7 +142,7 @@ class SubscriptionController extends Controller
             }
 
             $subscription = Subscription::findOrFail($id);
-            
+
             if ($subscription->status !== 'pending') {
                 return $this->errorResponse([
                     'ar' => 'هذا الطلب تم التعامل معه مسبقاً',
