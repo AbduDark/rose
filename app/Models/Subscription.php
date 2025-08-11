@@ -16,6 +16,7 @@ class Subscription extends Model
         'parent_phone',
         'student_info',
         'subscribed_at',
+        'expires_at',
         'is_active',
         'is_approved',
         'status',
@@ -98,5 +99,24 @@ class Subscription extends Model
     public function isRejected()
     {
         return $this->status === 'rejected';
+    }
+
+    public function isExpired()
+    {
+        return $this->expires_at && $this->expires_at->isPast();
+    }
+
+    public function isActiveAndNotExpired()
+    {
+        return $this->is_active && $this->status === 'approved' && !$this->isExpired();
+    }
+
+    public function getDaysRemaining()
+    {
+        if (!$this->expires_at) {
+            return null;
+        }
+        
+        return max(0, $this->expires_at->diffInDays(now(), false));
     }
 }

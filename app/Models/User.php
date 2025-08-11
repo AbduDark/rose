@@ -83,6 +83,10 @@ class User extends Authenticatable
                     ->where('course_id', $courseId)
                     ->where('is_active', true)
                     ->where('status', 'approved')
+                    ->where(function($query) {
+                        $query->whereNull('expires_at')
+                              ->orWhere('expires_at', '>', now());
+                    })
                     ->exists();
     }
 

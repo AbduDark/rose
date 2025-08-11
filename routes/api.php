@@ -56,9 +56,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
 
     // Subscriptions
-    Route::post('subscribe', [SubscriptionController::class, 'subscribe']);
-    Route::get('my-subscriptions', [SubscriptionController::class, 'mySubscriptions']);
-    Route::delete('subscriptions/{id}', [SubscriptionController::class, 'cancelSubscription']);
+    Route::post('/subscribe', [SubscriptionController::class, 'subscribe']);
+    Route::get('/my-subscriptions', [SubscriptionController::class, 'mySubscriptions']);
+    Route::post('/subscriptions/{id}/cancel', [SubscriptionController::class, 'cancelSubscription']);
+    Route::post('/subscriptions/renew', [SubscriptionController::class, 'renewSubscription']);
+    Route::get('/expired-subscriptions', [SubscriptionController::class, 'getExpiredSubscriptions']);
 
     // Comments
     Route::post('comments', [CommentController::class, 'store']);

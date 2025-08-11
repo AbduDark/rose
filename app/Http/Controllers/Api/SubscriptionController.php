@@ -115,6 +115,7 @@ class SubscriptionController extends Controller
                 'is_active' => true,
                 'approved_at' => now(),
                 'approved_by' => Auth::id(),
+                'expires_at' => now()->addDays(30), // 30 يوم من تاريخ الموافقة
                 'admin_notes' => $request->get('admin_notes')
             ]);
 
@@ -186,6 +187,74 @@ class SubscriptionController extends Controller
             return $this->successResponse(null, [
                 'ar' => 'تم إلغاء الاشتراك بنجاح',
                 'en' => 'Subscription cancelled successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->serverErrorResponse();
+        }
+    }
+
+    public function renewSubscription(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'subscription_id' => 'required|exists:subscriptions,id',
+                'vodafone_number' => 'required|string|regex:/^01[0-2]\d{8}$/',
+                'parent_phone' => 'required|string|regex:/^01[0-2]\d{8}$/',
+            ]);
+
+            if ($validator->fails()) {
+                return $this->validationErrorResponse($validator->errors());
+            }
+
+            $user = Auth::user();
+            $subscription = Subscription::where('id', $request->subscription_id)
+                ->where('user_id', $user->id)
+                ->firstOrFail();
+
+            // إنشاء طلب تجديد جديد
+            $renewalSubscription = Subscription::create([
+                'user_id' => $user->id,
+                'course_id' => $subscription->course_id,
+                'vodafone_number' => $request->vodafone_number,
+                'parent_phone' => $request->parent_phone,
+                'student_info' => 'طلب تجديد اشتراك',
+                'status' => 'pending',
+                'is_active' => false,
+                'is_approved' => false,
+                'subscribed_at' => now()
+            ]);
+
+            // إلغاء تفعيل الاشتراك القديم
+            $subscription->update(['is_active' => false]);
+
+            return $this->successResponse([
+                'renewal_request' => $renewalSubscription->load(['course', 'user'])
+            ], [
+                'ar' => 'تم إرسال طلب تجديد الاشتراك بنجاح، سيتم مراجعته من قبل الإدارة',
+                'en' => 'Subscription renewal request sent successfully, it will be reviewed by administration'
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->serverErrorResponse();
+        }
+    }
+
+    public function getExpiredSubscriptions()
+    {
+        try {
+            $user = Auth::user();
+            $expiredSubscriptions = Subscription::where('user_id', $user->id)
+                ->where('status', 'approved')
+                ->where('expires_at', '<', now())
+                ->with(['course'])
+                ->get();
+
+            return $this->successResponse([
+                'expired_subscriptions' => $expiredSubscriptions
+            ], [
+                'ar' => 'تم جلب الاشتراكات المنتهية بنجاح',
+                'en' => 'Expired subscriptions retrieved successfully'
             ]);
 
         } catch (\Exception $e) {
