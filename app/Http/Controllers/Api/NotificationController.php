@@ -153,6 +153,7 @@ class NotificationController extends Controller
                 'user_ids' => 'array|exists:users,id',
                 'course_id' => 'nullable|exists:courses,id',
                 'send_to_all' => 'boolean',
+                'gender' => 'nullable|in:male,female',
                 'data' => 'nullable|array'
             ]);
 
@@ -166,17 +167,38 @@ class NotificationController extends Controller
             // تحديد المستخدمين المستهدفين
             if ($request->send_to_all) {
                 // إرسال لجميع الطلبة
-                $users = User::where('role', 'student')->get();
+                $usersQuery = User::where('role', 'student');
+                
+                // فلترة حسب الجنس إذا تم تحديده
+                if ($request->gender) {
+                    $usersQuery->where('gender', $request->gender);
+                }
+                
+                $users = $usersQuery->get();
             } elseif ($request->course_id) {
                 // إرسال لطلبة كورس محدد
-                $users = User::whereHas('subscriptions', function ($query) use ($request) {
+                $usersQuery = User::whereHas('subscriptions', function ($query) use ($request) {
                     $query->where('course_id', $request->course_id)
                           ->where('is_active', true)
                           ->where('status', 'approved');
-                })->get();
+                });
+                
+                // فلترة حسب الجنس إذا تم تحديده
+                if ($request->gender) {
+                    $usersQuery->where('gender', $request->gender);
+                }
+                
+                $users = $usersQuery->get();
             } else {
                 // إرسال لمستخدمين محددين
-                $users = User::whereIn('id', $request->user_ids ?? [])->get();
+                $usersQuery = User::whereIn('id', $request->user_ids ?? []);
+                
+                // فلترة حسب الجنس إذا تم تحديده
+                if ($request->gender) {
+                    $usersQuery->where('gender', $request->gender);
+                }
+                
+                $users = $usersQuery->get();
             }
 
             // إنشاء الإشعارات

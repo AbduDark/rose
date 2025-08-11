@@ -49,6 +49,31 @@ class NotificationService
     }
 
     /**
+     * إرسال إشعار لطلبة حسب الجنس
+     */
+    public static function sendToStudentsByGender($gender, $title, $message, $type = 'general', $courseId = null, $senderId = null, $data = null)
+    {
+        $studentIds = User::where('role', 'student')
+                         ->where('gender', $gender)
+                         ->pluck('id')->toArray();
+        return self::sendToUsers($studentIds, $title, $message, $type, $courseId, $senderId, $data);
+    }
+
+    /**
+     * إرسال إشعار لطلبة كورس معين حسب الجنس
+     */
+    public static function sendToCourseStudentsByGender($courseId, $gender, $title, $message, $type = 'course', $senderId = null, $data = null)
+    {
+        $studentIds = User::whereHas('subscriptions', function ($query) use ($courseId) {
+            $query->where('course_id', $courseId)
+                  ->where('is_active', true)
+                  ->where('status', 'approved');
+        })->where('gender', $gender)->pluck('id')->toArray();
+
+        return self::sendToUsers($studentIds, $title, $message, $type, $courseId, $senderId, $data);
+    }
+
+    /**
      * إرسال إشعار لطلبة كورس معين
      */
     public static function sendToCourseStudents($courseId, $title, $message, $type = 'course', $senderId = null, $data = null)
