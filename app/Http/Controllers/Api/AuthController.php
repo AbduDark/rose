@@ -410,7 +410,7 @@ class AuthController extends Controller
         }
     }
 
-  public function updateProfile(Request $request)
+ public function updateProfile(Request $request)
 {
     try {
         $user = $request->user();
@@ -426,64 +426,43 @@ class AuthController extends Controller
             'name'  => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:20|unique:users,phone,' . $user->id,
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
-        ], [
-            'name.string'   => 'الاسم يجب أن يكون نص',
-            'name.max'      => 'الاسم يجب ألا يزيد عن 255 حرف',
-            'phone.string'  => 'رقم الهاتف يجب أن يكون نص',
-            'phone.max'     => 'رقم الهاتف يجب ألا يزيد عن 20 رقم|Phone number must not exceed 20 digits',
-            'phone.unique'  => 'رقم الهاتف مستخدم بالفعل|Phone number already exists',
-            'image.image'   => 'الملف المرفوع يجب أن يكون صورة|Uploaded file must be an image',
-            'image.mimes'   => 'نوع الصورة يجب أن يكون jpeg, png, jpg, أو gif|Image must be jpeg, png, jpg, or gif',
-            'image.max'     => 'حجم الصورة يجب ألا يزيد عن 2 ميجابايت|Image size must not exceed 2MB'
         ]);
 
         if ($validator->fails()) {
             return $this->validationErrorResponse(new ValidationException($validator));
         }
 
-        // تحديث البيانات
-        if ($request->filled('name')) {
-            $user->name = $request->name;
-        }
-        if ($request->filled('phone')) {
-            $user->phone = $request->phone;
-        }
+        // Prepare update data
+        $updateData = array_filter([
+            'name'  => $request->name,
+            'phone' => $request->phone,
+        ]);
 
-        // تحديث الصورة
+        // Handle image upload
         if ($request->hasFile('image')) {
-            // حذف الصورة القديمة إذا كانت موجودة
-            if ($user->image && file_exists(public_path($user->image))) {
-                unlink(public_path($user->image));
+            // Delete old image if exists
+            if ($user->image && Storage::disk('public')->exists($user->image)) {
+                Storage::disk('public')->delete($user->image);
             }
 
-            $image      = $request->file('image');
-            $imageName  = uniqid('avatar_') . '.' . $image->getClientOriginalExtension();
-            $uploadPath = public_path('uploads/avatars');
-
-            if (!file_exists($uploadPath)) {
-                mkdir($uploadPath, 0777, true);
-            }
-
-            $image->move($uploadPath, $imageName);
-            $user->image = 'uploads/avatars/' . $imageName;
+            $path = $request->file('image')->store('uploads/avatars', 'public');
+            $updateData['image'] = $path;
         }
 
-        // حفظ التغييرات مرة واحدة
-        $user->save();
+        // Update user
+        $user->update($updateData);
 
-        // إرجاع البيانات المحدثة
-        $userData = [
-            'id'     => $user->id,
-            'name'   => $user->name,
-            'email'  => $user->email,
-            'phone'  => $user->phone,
-            'gender' => $user->gender,
-            'role'   => $user->role ?? 'student',
-            'image_url' => $user->image ? url($user->image) : null,
-        ];
-
+        // Response
         return $this->successResponse([
-            'user' => $userData
+            'user' => [
+                'id'        => $user->id,
+                'name'      => $user->name,
+                'email'     => $user->email,
+                'phone'     => $user->phone,
+                'gender'    => $user->gender,
+                'role'      => $user->role ?? 'student',
+                'image_url' => $user->image ? Storage::url($user->image) : null,
+            ]
         ], [
             'ar' => 'تم تحديث الملف الشخصي بنجاح',
             'en' => 'Profile updated successfully'
@@ -494,11 +473,13 @@ class AuthController extends Controller
             'user_id' => $request->user()?->id,
             'error'   => $e->getMessage(),
             'trace'   => $e->getTraceAsString(),
-            'request' => $request->all()
+            'request' => collect($request->except(['password', 'token'])) // mask sensitive fields
         ]);
+
         return $this->serverErrorResponse();
     }
 }
+
 
 
    public function forgotPassword(Request $request)
