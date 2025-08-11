@@ -449,7 +449,8 @@ class AuthController extends Controller
         $user->image = 'uploads/avatars/' . $imageName;
     }
 
-
+        // حفظ الصورة
+        $user->save();
 
         // تحديث البيانات الأخرى
         if ($request->filled('name')) {
