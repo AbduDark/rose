@@ -233,11 +233,12 @@ class AuthController extends Controller
     try {
         $user = $request->user();
 
-        if (!$user) {
+        // التحقق من وجود التوكن والمستخدم
+        if (!$user || !$request->bearerToken()) {
             return $this->errorResponse([
-                'ar' => 'لم يتم العثور على المستخدم',
-                'en' => 'User not found'
-            ], 404);
+                'ar' => 'يجب تسجيل الدخول أولاً',
+                'en' => 'You must be logged in to perform this action'
+            ], 401);
         }
 
         // تسجيل معلومات تسجيل الخروج
@@ -249,9 +250,7 @@ class AuthController extends Controller
         ]);
 
         // إلغاء التوكن الحالي فقط
-        if ($user->currentAccessToken()) {
-            $user->currentAccessToken()->delete();
-        }
+        $user->currentAccessToken()->delete();
 
         // مسح معرف الجلسة النشطة للجهاز الحالي فقط
         if ($user->active_session_id) {
@@ -272,38 +271,43 @@ class AuthController extends Controller
     }
 }
 
-   public function forceLogout(Request $request)
+  public function forceLogout(Request $request)
 {
     try {
-        $request->validate([
-            'email' => 'required|email',
-        ]);
+        $user = $request->user();
 
-        $user = User::where('email', $request->email)->first();
-
-        if (!$user) {
+        // التحقق من وجود التوكن والمستخدم
+        if (!$user || !$request->bearerToken()) {
             return $this->errorResponse([
-                'ar' => 'لم يتم العثور على المستخدم',
-                'en' => 'User not found'
-            ], 404);
+                'ar' => 'يجب تسجيل الدخول أولاً',
+                'en' => 'You must be logged in to perform this action'
+            ], 401);
         }
 
-        // إلغاء جميع توكنات المستخدم
-        $user->tokens()->delete();
+        $request->validate([
+            'email' => 'required|email|exists:users,email',
+        ]);
 
-        // مسح جميع بيانات الجلسات
+        // التحقق من أن المستخدم يحاول تسجيل خروج نفسه فقط
+        if ($user->email !== $request->email) {
+            return $this->errorResponse([
+                'ar' => 'غير مصرح لك بتسجيل خروج مستخدم آخر',
+                'en' => 'You are not authorized to logout another user'
+            ], 403);
+        }
+
+        // Force logout from all devices
+        $user->tokens()->delete();
         $user->update([
             'active_session_id' => null,
             'device_fingerprint' => null,
         ]);
 
-        // تسجيل الحدث في السجلات الأمنية
         Log::channel('security')->info('Force logout performed', [
             'user_id' => $user->id,
             'email' => $user->email,
             'ip' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'initiated_by' => $request->user() ? $request->user()->email : 'system'
+            'user_agent' => $request->userAgent()
         ]);
 
         return $this->successResponse([], [
@@ -312,7 +316,7 @@ class AuthController extends Controller
         ]);
 
     } catch (\Exception $e) {
-        Log::channel('security')->error('Force logout error for email ' . ($request->email ?? 'unknown') . ': ' . $e->getMessage(), [
+        Log::channel('security')->error('Force logout error for user ' . ($user->id ?? 'unknown') . ': ' . $e->getMessage(), [
             'exception' => $e,
             'ip' => $request->ip()
         ]);
