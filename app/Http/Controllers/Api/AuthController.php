@@ -288,26 +288,22 @@ class AuthController extends Controller
             ], 404);
         }
 
-        // التحقق من التوكن إذا كان مطلوبًا
-        if (!$request->user() || $request->user()->id !== $user->id) {
-            return $this->errorResponse([
-                'ar' => 'غير مصرح بهذا الإجراء',
-                'en' => 'Unauthorized action'
-            ], 403);
-        }
-
-        // Force logout from all devices
+        // إلغاء جميع توكنات المستخدم
         $user->tokens()->delete();
+
+        // مسح جميع بيانات الجلسات
         $user->update([
             'active_session_id' => null,
             'device_fingerprint' => null,
         ]);
 
+        // تسجيل الحدث في السجلات الأمنية
         Log::channel('security')->info('Force logout performed', [
             'user_id' => $user->id,
             'email' => $user->email,
             'ip' => $request->ip(),
-            'user_agent' => $request->userAgent()
+            'user_agent' => $request->userAgent(),
+            'initiated_by' => $request->user() ? $request->user()->email : 'system'
         ]);
 
         return $this->successResponse([], [
