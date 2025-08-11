@@ -72,18 +72,16 @@ class AuthController extends Controller
         mkdir(public_path('avatars'), 0777, true);
     }
 
-    if ($request->hasFile('image')) {
-        $imageName = time() . '.' . $request->image->extension();
-        $request->image->move(public_path('avatars'), $imageName);
-    } else {
-        // لو مفيش صورة نعمل نسخة من default.svg
-        $imageName = 'default.svg';
-        $defaultPath = public_path('avatars/' . $imageName);
-        if (!file_exists($defaultPath)) {
-            // نتأكد أن الصورة الافتراضية موجودة
-            copy(public_path('default.svg'), $defaultPath);
-        }
+        $imagePath = 'avatars/default.svg';
+
+
+        if ($request->hasFile('image')) {
+        $image      = $request->file('image');
+        $imageName  = uniqid('avatar_') . '.' . $image->getClientOriginalExtension();
+        $image->storeAs('public/avatars', $imageName);
+        $imagePath = 'avatars/' . $imageName;
     }
+
         $user = User::create([
             'name'             => $request->name,
             'email'            => $request->email,
@@ -94,7 +92,7 @@ class AuthController extends Controller
             'pin_expires_at'   => Carbon::now()->addMinutes(10),
             'email_verified_at'=> null,
             'role'             => 'student',
-            'image'            => 'avatars/' . $imageName, // نخزن المسار النسبي
+            'image'            =>  $imagePath, // نحفظ المسار فقط
         ]);
 
         // إنشاء سجل التحقق من البريد
