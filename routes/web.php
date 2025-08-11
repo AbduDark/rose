@@ -29,6 +29,14 @@ Route::get('/api-docs', function () {
 Route::get('/roadmap', function () {
     return response()->file(public_path('roadmap.html'));
 });
+use Illuminate\Http\Request;
+
+Route::get('/reset-password', function (Request $request) {
+    return view('auth.reset-password', [
+        'token' => $request->query('token'),
+        'email' => $request->query('email')
+    ]);
+});
 
 Route::get('/verify-email', function () {
     return response()->file(public_path('verify-email.html'));
