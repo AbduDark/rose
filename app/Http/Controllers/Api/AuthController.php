@@ -126,7 +126,7 @@ class AuthController extends Controller
         // تجهيز بيانات الاستجابة مع رابط الصورة
         $userData = $user->only(['id', 'name', 'email', 'phone', 'gender', 'role']);
         $userData['image_url'] =url($user->image);
-        
+
         return $this->successResponse([
             'user' => $userData,
             'email_verification_required' => true
@@ -436,37 +436,20 @@ class AuthController extends Controller
         }
 
         // تحديث الصورة
-        if ($request->hasFile('image') && $request->file('image')->isValid()) {
+        if ($request->hasFile('image')) {
+        $image      = $request->file('image');
+        $imageName  = uniqid('avatar_') . '.' . $image->getClientOriginalExtension();
 
-            // إنشاء مجلد profiles إذا لم يكن موجود
-            if (!Storage::disk('public')->exists('profiles')) {
-                Storage::disk('public')->makeDirectory('profiles');
-            }
-
-            // حذف الصورة القديمة لو موجودة
-            if ($user->image && Storage::disk('public')->exists($user->image)) {
-                Storage::disk('public')->delete($user->image);
-            }
-
-            try {
-                $imagePath = $request->file('image')->store('profiles', 'public');
-                $user->image = $imagePath;
-
-                Log::info('Profile image updated', [
-                    'user_id'    => $user->id,
-                    'image_path' => $imagePath
-                ]);
-            } catch (\Exception $e) {
-                Log::error('Image upload failed', [
-                    'user_id' => $user->id,
-                    'error'   => $e->getMessage()
-                ]);
-                return $this->errorResponse([
-                    'ar' => 'فشل في رفع الصورة، يرجى المحاولة مرة أخرى',
-                    'en' => 'Failed to upload image, please try again'
-                ], 500);
-            }
+        $uploadPath = public_path('uploads/avatars');
+        if (!file_exists($uploadPath)) {
+            mkdir($uploadPath, 0777, true);
         }
+
+        $image->move($uploadPath, $imageName);
+        $user->image = 'uploads/avatars/' . $imageName;
+    }
+
+
 
         // تحديث البيانات الأخرى
         if ($request->filled('name')) {
@@ -504,8 +487,7 @@ class AuthController extends Controller
             'phone'  => $user->phone,
             'gender' => $user->gender,
             'role'   => $user->role ?? 'student',
-            'image'  => $user->image,
-            'image_url' => $user->image ? asset('storage/' . $user->image) : null
+             'image_url' => url($user->image),
         ];
 
         return $this->successResponse([
