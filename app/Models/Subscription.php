@@ -117,6 +117,26 @@ class Subscription extends Model
             return null;
         }
         
-        return max(0, $this->expires_at->diffInDays(now(), false));
+        $diff = $this->expires_at->diffInDays(now(), false);
+        return $this->expires_at->isFuture() ? $diff : 0;
+    }
+
+    public function getHoursRemaining()
+    {
+        if (!$this->expires_at) {
+            return null;
+        }
+        
+        $diff = $this->expires_at->diffInHours(now(), false);
+        return $this->expires_at->isFuture() ? $diff : 0;
+    }
+
+    public function isExpiringSoon($days = 3)
+    {
+        if (!$this->expires_at) {
+            return false;
+        }
+        
+        return $this->getDaysRemaining() <= $days && !$this->isExpired();
     }
 }

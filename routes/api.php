@@ -61,6 +61,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/subscriptions/{id}/cancel', [SubscriptionController::class, 'cancelSubscription']);
     Route::post('/subscriptions/renew', [SubscriptionController::class, 'renewSubscription']);
     Route::get('/expired-subscriptions', [SubscriptionController::class, 'getExpiredSubscriptions']);
+    Route::get('/subscriptions/status/{courseId}', [SubscriptionController::class, 'getSubscriptionStatus']);
 
     // Comments
     Route::post('comments', [CommentController::class, 'store']);

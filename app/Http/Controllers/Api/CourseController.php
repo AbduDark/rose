@@ -116,6 +116,37 @@ class CourseController extends BaseController
             $course->is_subscribed = $user ? $user->isSubscribedTo($id) : false;
             $course->is_favorited = $user ? $user->hasFavorited($id) : false;
 
+            $subscriptionInfo = null;
+
+            if ($user && !$user->isAdmin()) {
+                $subscription = $user->subscriptions()
+                    ->where('course_id', $id)
+                    ->where('status', 'approved')
+                    ->first();
+
+                if ($subscription) {
+                    $subscriptionInfo = [
+                        'is_subscribed' => true,
+                        'is_active' => $subscription->is_active,
+                        'is_expired' => $subscription->isExpired(),
+                        'expires_at' => $subscription->expires_at,
+                        'days_remaining' => $subscription->getDaysRemaining(),
+                        'hours_remaining' => $subscription->getHoursRemaining(),
+                        'is_expiring_soon' => $subscription->isExpiringSoon(),
+                        'subscription_id' => $subscription->id
+                    ];
+                } else {
+                    $subscriptionInfo = [
+                        'is_subscribed' => false,
+                        'message' => [
+                            'ar' => 'يجب الاشتراك في هذا الكورس للوصول إلى محتواه',
+                            'en' => 'You must subscribe to this course to access its content'
+                        ]
+                    ];
+                }
+            }
+
+
             return $this->successResponse(
                 new CourseResource($course),
                 [

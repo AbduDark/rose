@@ -261,4 +261,69 @@ class SubscriptionController extends Controller
             return $this->serverErrorResponse();
         }
     }
+
+    public function getSubscriptionStatus($courseId)
+    {
+        try {
+            $user = Auth::user();
+            $subscription = Subscription::where('user_id', $user->id)
+                ->where('course_id', $courseId)
+                ->where('status', 'approved')
+                ->first();
+
+            if (!$subscription) {
+                return $this->successResponse([
+                    'subscription_status' => 'not_subscribed',
+                    'message' => [
+                        'ar' => 'لم تشترك في هذا الكورس بعد',
+                        'en' => 'You are not subscribed to this course yet'
+                    ]
+                ]);
+            }
+
+            $daysRemaining = $subscription->getDaysRemaining();
+            $isExpired = $subscription->isExpired();
+            $isActive = $subscription->is_active;
+
+            $status = 'active';
+            $message = [
+                'ar' => "اشتراكك نشط، متبقي {$daysRemaining} يوم",
+                'en' => "Your subscription is active, {$daysRemaining} days remaining"
+            ];
+
+            if ($isExpired) {
+                $status = 'expired';
+                $daysExpired = now()->diffInDays($subscription->expires_at);
+                $message = [
+                    'ar' => "انتهت صلاحية اشتراكك منذ {$daysExpired} يوم. يرجى التجديد.",
+                    'en' => "Your subscription expired {$daysExpired} days ago. Please renew."
+                ];
+            } elseif (!$isActive) {
+                $status = 'inactive';
+                $message = [
+                    'ar' => 'اشتراكك غير نشط حالياً',
+                    'en' => 'Your subscription is currently inactive'
+                ];
+            } elseif ($daysRemaining <= 3) {
+                $status = 'expiring_soon';
+                $message = [
+                    'ar' => "اشتراكك سينتهي قريباً! متبقي {$daysRemaining} يوم فقط",
+                    'en' => "Your subscription is expiring soon! Only {$daysRemaining} days remaining"
+                ];
+            }
+
+            return $this->successResponse([
+                'subscription_status' => $status,
+                'subscription' => $subscription,
+                'days_remaining' => $daysRemaining,
+                'is_expired' => $isExpired,
+                'is_active' => $isActive,
+                'expires_at' => $subscription->expires_at,
+                'message' => $message
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->serverErrorResponse();
+        }
+    }
 }
