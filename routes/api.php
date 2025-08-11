@@ -28,6 +28,12 @@ Route::get('/', function () {
 Route::get('/health', function () {
     return response()->json(['status' => 'OK', 'timestamp' => now()]);
 });
+Route::get('reset-password', function (Request $request) {
+    return view('auth.reset-password', [
+        'token' => $request->query('token'),
+        'email' => $request->query('email')
+    ]);
+});
 
 
 // Public Routes
