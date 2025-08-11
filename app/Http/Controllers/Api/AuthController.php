@@ -24,82 +24,91 @@ use Illuminate\Support\Facades\Storage;
 class AuthController extends Controller
 {
     public function register(Request $request)
-    {
-        try {
-            $validator = Validator::make($request->all(), [
-                'name' => 'required|string|max:255',
-                'email' => 'required|string|email|max:255|unique:users',
-                'password' => 'required|string|min:8|confirmed|regex:/^(?=.*[a-zA-Z])(?=.*\d)[a-zA-Z\d]+$/',
-                'phone' => 'required|string|max:20|unique:users',
-                'gender' => 'required|in:male,female'
-            ], [
-                'name.required' => 'الاسم مطلوب|Name is required',
-                'name.string' => 'الاسم يجب أن يكون نص|Name must be a string',
-                'name.max' => 'الاسم يجب ألا يزيد عن 255 حرف|Name must not exceed 255 characters',
-                'email.required' => 'البريد الإلكتروني مطلوب|Email is required',
-                'email.email' => 'البريد الإلكتروني غير صحيح|Invalid email format',
-                'email.unique' => 'البريد الإلكتروني مستخدم بالفعل|Email already exists',
-                'password.required' => 'كلمة المرور مطلوبة|Password is required',
-                'password.min' => 'كلمة المرور يجب ألا تقل عن 8 أحرف|Password must be at least 8 characters',
-                'password.confirmed' => 'تأكيد كلمة المرور غير مطابق|Password confirmation does not match',
-                'phone.required' => 'رقم الهاتف مطلوب|Phone number is required',
-                'phone.max' => 'رقم الهاتف يجب ألا يزيد عن 20 رقم|Phone number must not exceed 20 digits',
-                'phone.unique' => 'رقم الهاتف مستخدم بالفعل|Phone number already exists',
-                'gender.required' => 'الجنس مطلوب|Gender is required',
-                'gender.in' => 'الجنس يجب أن يكون ذكر أو أنثى|Gender must be male or female'
-            ]);
+{
+    try {
+        $validator = Validator::make($request->all(), [
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|string|email|max:255|unique:users',
+            'password' => 'required|string|min:8|confirmed|regex:/^(?=.*[a-zA-Z])(?=.*\d)[a-zA-Z\d]+$/',
+            'phone'    => 'required|string|max:20|unique:users',
+            'gender'   => 'required|in:male,female'
+        ], [
+            'name.required'     => 'الاسم مطلوب|Name is required',
+            'name.string'       => 'الاسم يجب أن يكون نص|Name must be a string',
+            'name.max'          => 'الاسم يجب ألا يزيد عن 255 حرف|Name must not exceed 255 characters',
+            'email.required'    => 'البريد الإلكتروني مطلوب|Email is required',
+            'email.email'       => 'البريد الإلكتروني غير صحيح|Invalid email format',
+            'email.unique'      => 'البريد الإلكتروني مستخدم بالفعل|Email already exists',
+            'password.required' => 'كلمة المرور مطلوبة|Password is required',
+            'password.min'      => 'كلمة المرور يجب ألا تقل عن 8 أحرف|Password must be at least 8 characters',
+            'password.confirmed'=> 'تأكيد كلمة المرور غير مطابق|Password confirmation does not match',
+            'phone.required'    => 'رقم الهاتف مطلوب|Phone number is required',
+            'phone.max'         => 'رقم الهاتف يجب ألا يزيد عن 20 رقم|Phone number must not exceed 20 digits',
+            'phone.unique'      => 'رقم الهاتف مستخدم بالفعل|Phone number already exists',
+            'gender.required'   => 'الجنس مطلوب|Gender is required',
+            'gender.in'         => 'الجنس يجب أن يكون ذكر أو أنثى|Gender must be male or female'
+        ]);
 
-            if ($validator->fails()) {
-                return $this->validationErrorResponse(new ValidationException($validator));
-            }
-
-            $pin = rand(100000, 999999);
-            $token = Str::random(60);
-
-            $user = User::create([
-                'name' => $request->name,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
-                'phone' => $request->phone,
-                'gender' => $request->gender,
-                'pin' => $pin,
-                'pin_expires_at' => Carbon::now()->addMinutes(10),
-                'email_verified_at' => null,
-                'role' => 'student'
-            ]);
-
-            // Create email verification record
-            EmailVerification::create([
-                'email' => $user->email,
-                'token' => $token,
-                'expires_at' => Carbon::now()->addHours(24)
-            ]);
-
-            // Send verification email
-            try {
-                $verificationUrl = url("/api/auth/verify-email?token={$token}");
-                Mail::to($user->email)->send(new EmailVerificationMail($verificationUrl));
-            } catch (\Exception $e) {
-                Log::error('Email sending failed: ' . $e->getMessage());
-                return $this->errorResponse([
-                    'ar' => 'حدث خطأ في إرسال بريد التحقق. يرجى المحاولة لاحقاً.',
-                    'en' => 'Failed to send verification email. Please try again later.'
-                ], 500);
-            }
-
-            return $this->successResponse([
-                'user' => $user->only(['id', 'name', 'email', 'phone', 'gender', 'role']),
-                'email_verification_required' => true
-            ], [
-                'ar' => 'تم تسجيل المستخدم بنجاح. يرجى التحقق من بريدك الإلكتروني للتحقق.',
-                'en' => 'User registered successfully. Please check your email for verification.'
-            ], 201);
-
-        } catch (\Exception $e) {
-            Log::error('Registration failed: ' . $e->getMessage());
-            return $this->serverErrorResponse();
+        if ($validator->fails()) {
+            return $this->validationErrorResponse(new ValidationException($validator));
         }
+
+        $pin = rand(100000, 999999);
+        $token = Str::random(60);
+
+        // مسار الصورة الافتراضية
+        $defaultAvatar = 'avatars/default.svg'; // داخل storage/app/public/avatars/default.png
+
+        $user = User::create([
+            'name'             => $request->name,
+            'email'            => $request->email,
+            'password'         => Hash::make($request->password),
+            'phone'            => $request->phone,
+            'gender'           => $request->gender,
+            'pin'              => $pin,
+            'pin_expires_at'   => Carbon::now()->addMinutes(10),
+            'email_verified_at'=> null,
+            'role'             => 'student',
+            'image'            => $defaultAvatar // حفظ الصورة الافتراضية
+        ]);
+
+        // إنشاء سجل التحقق من البريد
+        EmailVerification::create([
+            'email'      => $user->email,
+            'token'      => $token,
+            'expires_at' => Carbon::now()->addHours(24)
+        ]);
+
+        // إرسال البريد الإلكتروني للتحقق
+        try {
+            $verificationUrl = url("/api/auth/verify-email?token={$token}");
+            Mail::to($user->email)->send(new EmailVerificationMail($verificationUrl));
+        } catch (\Exception $e) {
+            Log::error('Email sending failed: ' . $e->getMessage());
+            return $this->errorResponse([
+                'ar' => 'حدث خطأ في إرسال بريد التحقق. يرجى المحاولة لاحقاً.',
+                'en' => 'Failed to send verification email. Please try again later.'
+            ], 500);
+        }
+
+        // تجهيز بيانات الاستجابة مع رابط الصورة
+        $userData = $user->only(['id', 'name', 'email', 'phone', 'gender', 'role']);
+        $userData['image_url'] = asset('storage/' . $user->image);
+
+        return $this->successResponse([
+            'user' => $userData,
+            'email_verification_required' => true
+        ], [
+            'ar' => 'تم تسجيل المستخدم بنجاح. يرجى التحقق من بريدك الإلكتروني للتحقق.',
+            'en' => 'User registered successfully. Please check your email for verification.'
+        ], 201);
+
+    } catch (\Exception $e) {
+        Log::error('Registration failed: ' . $e->getMessage());
+        return $this->serverErrorResponse();
     }
+}
+
 
     public function login(Request $request)
     {
@@ -369,127 +378,121 @@ class AuthController extends Controller
         }
     }
 
-    public function updateProfile(Request $request)
-    {
-        try {
-            $user = $request->user();
+  public function updateProfile(Request $request)
+{
+    try {
+        $user = $request->user();
 
-            $validator = Validator::make($request->all(), [
-                'name' => 'nullable|string|max:255',
-                'phone' => 'nullable|string|max:20|unique:users,phone,' . $user->id,
-                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            ], [
-                'name.string' => 'الاسم يجب أن يكون نص|Name must be a string',
-                'name.max' => 'الاسم يجب ألا يزيد عن 255 حرف|Name must not exceed 255 characters',
-                'phone.string' => 'رقم الهاتف يجب أن يكون نص|Phone must be a string',
-                'phone.max' => 'رقم الهاتف يجب ألا يزيد عن 20 رقم|Phone number must not exceed 20 digits',
-                'phone.unique' => 'رقم الهاتف مستخدم بالفعل|Phone number already exists',
-                'image.image' => 'الملف المرفوع يجب أن يكون صورة|Uploaded file must be an image',
-                'image.mimes' => 'نوع الصورة يجب أن يكون jpeg, png, jpg, أو gif|Image must be jpeg, png, jpg, or gif',
-                'image.max' => 'حجم الصورة يجب ألا يزيد عن 2 ميجابايت|Image size must not exceed 2MB'
-            ]);
+        // التحقق من البيانات
+        $validator = Validator::make($request->all(), [
+            'name'  => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:20|unique:users,phone,' . $user->id,
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ], [
+            'name.string'   => 'الاسم يجب أن يكون نص|Name must be a string',
+            'name.max'      => 'الاسم يجب ألا يزيد عن 255 حرف|Name must not exceed 255 characters',
+            'phone.string'  => 'رقم الهاتف يجب أن يكون نص|Phone must be a string',
+            'phone.max'     => 'رقم الهاتف يجب ألا يزيد عن 20 رقم|Phone number must not exceed 20 digits',
+            'phone.unique'  => 'رقم الهاتف مستخدم بالفعل|Phone number already exists',
+            'image.image'   => 'الملف المرفوع يجب أن يكون صورة|Uploaded file must be an image',
+            'image.mimes'   => 'نوع الصورة يجب أن يكون jpeg, png, jpg, أو gif|Image must be jpeg, png, jpg, or gif',
+            'image.max'     => 'حجم الصورة يجب ألا يزيد عن 2 ميجابايت|Image size must not exceed 2MB'
+        ]);
 
-            if ($validator->fails()) {
-                return $this->validationErrorResponse(new ValidationException($validator));
+        if ($validator->fails()) {
+            return $this->validationErrorResponse(new ValidationException($validator));
+        }
+
+        // تحديث الصورة
+        if ($request->hasFile('image') && $request->file('image')->isValid()) {
+
+            // إنشاء مجلد profiles إذا لم يكن موجود
+            if (!Storage::disk('public')->exists('profiles')) {
+                Storage::disk('public')->makeDirectory('profiles');
             }
 
-            // Update image if provided
-            if ($request->hasFile('image')) {
-                // إنشاء مجلد profiles إذا لم يكن موجود
-                if (!Storage::disk('public')->exists('profiles')) {
-                    Storage::disk('public')->makeDirectory('profiles');
-                }
-
-                // Delete old image if exists
-                if ($user->image && Storage::disk('public')->exists($user->image)) {
-                    Storage::disk('public')->delete($user->image);
-                }
-
-                try {
-                    $image = $request->file('image');
-                    $imagePath = $image->store('profiles', 'public');
-                    $user->image = $imagePath;
-
-                    Log::info('Profile image uploaded successfully', [
-                        'user_id' => $user->id,
-                        'image_path' => $imagePath
-                    ]);
-                } catch (\Exception $e) {
-                    Log::error('Failed to upload profile image', [
-                        'user_id' => $user->id,
-                        'error' => $e->getMessage()
-                    ]);
-
-                    return $this->errorResponse([
-                        'ar' => 'فشل في رفع الصورة، يرجى المحاولة مرة أخرى',
-                        'en' => 'Failed to upload image, please try again'
-                    ], 500);
-                }
+            // حذف الصورة القديمة لو موجودة
+            if ($user->image && Storage::disk('public')->exists($user->image)) {
+                Storage::disk('public')->delete($user->image);
             }
 
-            // Update name if provided
-            if ($request->filled('name')) {
-                $user->name = $request->name;
-            }
-
-            // Update phone if provided
-            if ($request->filled('phone')) {
-                $user->phone = $request->phone;
-            }
-
-            // حفظ التحديثات
             try {
-                $user->save();
-                Log::info('User profile updated successfully', [
-                    'user_id' => $user->id,
-                    'updated_fields' => array_keys($request->only(['name', 'phone', 'image']))
+                $imagePath = $request->file('image')->store('profiles', 'public');
+                $user->image = $imagePath;
+
+                Log::info('Profile image updated', [
+                    'user_id'    => $user->id,
+                    'image_path' => $imagePath
                 ]);
             } catch (\Exception $e) {
-                Log::error('Failed to save user profile', [
+                Log::error('Image upload failed', [
                     'user_id' => $user->id,
-                    'error' => $e->getMessage()
+                    'error'   => $e->getMessage()
                 ]);
-
                 return $this->errorResponse([
-                    'ar' => 'فشل في حفظ التحديثات',
-                    'en' => 'Failed to save updates'
+                    'ar' => 'فشل في رفع الصورة، يرجى المحاولة مرة أخرى',
+                    'en' => 'Failed to upload image, please try again'
                 ], 500);
             }
-
-            // إعادة تحميل البيانات من قاعدة البيانات
-            $user->refresh();
-
-            // إعداد بيانات المستخدم للإرجاع
-            $userData = [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'gender' => $user->gender,
-                'role' => $user->role ?? 'student',
-                'image' => $user->image,
-            ];
-
-            // إضافة URL كامل للصورة إذا وجدت
-            if ($user->image) {
-                $userData['image_url'] = url('storage/' . $user->image);
-            }
-
-            return $this->successResponse([
-                'user' => $userData
-            ], [
-                'ar' => 'تم تحديث الملف الشخصي بنجاح',
-                'en' => 'Profile updated successfully'
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Profile update error: ' . $e->getMessage(), [
-                'user_id' => $request->user()?->id,
-                'trace' => $e->getTraceAsString()
-            ]);
-            return $this->serverErrorResponse();
         }
+
+        // تحديث البيانات الأخرى
+        if ($request->filled('name')) {
+            $user->name = $request->name;
+        }
+        if ($request->filled('phone')) {
+            $user->phone = $request->phone;
+        }
+
+        // حفظ التغييرات
+        try {
+            $user->save();
+            Log::info('User profile updated', [
+                'user_id' => $user->id
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Profile save failed', [
+                'user_id' => $user->id,
+                'error'   => $e->getMessage()
+            ]);
+            return $this->errorResponse([
+                'ar' => 'فشل في حفظ التحديثات',
+                'en' => 'Failed to save updates'
+            ], 500);
+        }
+
+        // إعادة تحميل البيانات
+        $user->refresh();
+
+        // تجهيز بيانات الإرجاع
+        $userData = [
+            'id'     => $user->id,
+            'name'   => $user->name,
+            'email'  => $user->email,
+            'phone'  => $user->phone,
+            'gender' => $user->gender,
+            'role'   => $user->role ?? 'student',
+            'image'  => $user->image,
+            'image_url' => $user->image ? asset('storage/' . $user->image) : null
+        ];
+
+        return $this->successResponse([
+            'user' => $userData
+        ], [
+            'ar' => 'تم تحديث الملف الشخصي بنجاح',
+            'en' => 'Profile updated successfully'
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('Profile update error', [
+            'user_id' => $request->user()?->id,
+            'error'   => $e->getMessage(),
+            'trace'   => $e->getTraceAsString()
+        ]);
+        return $this->serverErrorResponse();
     }
+}
+
 
    public function forgotPassword(Request $request)
     {
