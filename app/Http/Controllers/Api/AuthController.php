@@ -20,6 +20,8 @@ use Carbon\Carbon;
 use App\Traits\ApiResponseTrait;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Storage;
+use App\Mail\PasswordResetMail;
+
 
 class AuthController extends Controller
 {
@@ -540,7 +542,7 @@ class AuthController extends Controller
             try {
                 // إرسال بريد إعادة التعيين
                 $resetUrl = url("/api/auth/reset-password?token={$token}&email=" . urlencode($request->email));
-                Mail::to($request->email)->send(new \App\Mail\PasswordResetMail($resetUrl, $user));
+                Mail::to($request->email)->send(new PasswordResetMail($resetUrl, $user));
 
                 // تسجيل نجاح العملية
                 Log::channel('security')->info('Password reset requested', [
