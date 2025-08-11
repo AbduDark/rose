@@ -21,7 +21,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
             'check.subscription' => \App\Http\Middleware\CheckSubscription::class,
-            'check.payment.access' => \App\Http\Middleware\CheckPaymentAccess::class,
             'gender.content' => \App\Http\Middleware\GenderContentMiddleware::class,
             'rate.limit' => \App\Http\Middleware\RateLimitMiddleware::class,
             'role' => \App\Http\Middleware\RoleMiddleware::class,

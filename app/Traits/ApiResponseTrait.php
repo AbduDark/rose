@@ -87,13 +87,16 @@ trait ApiResponseTrait
         ], 403);
     }
 
-    protected function serverErrorResponse(): JsonResponse
-    {
-        return $this->errorResponse([
-            'ar' => 'خطأ في الخادم الداخلي',
-            'en' => 'Internal server error'
-        ], 500);
-    }
+    protected function serverErrorResponse(string $message = 'An unexpected error occurred on the server.', int $status = 500)
+{
+    return response()->json([
+        'success' => false,
+        'message' => [
+            'ar' => 'حدث خطأ غير متوقع في الخادم.',
+            'en' => $message,
+        ],
+    ], $status);
+}
 
     private function getDefaultErrorMessage($statusCode): array
     {
