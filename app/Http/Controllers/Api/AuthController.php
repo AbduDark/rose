@@ -658,73 +658,77 @@ class AuthController extends Controller
   public function resetPassword(Request $request)
 {
     try {
+        // التحقق من البيانات المدخلة
         $validator = Validator::make($request->all(), [
-            'token' => 'required',
+            'token' => 'required|string',
             'email' => 'required|email|exists:users,email',
-            'password' => 'required|min:6|confirmed',
+            'password' => [
+                'required',
+                'string',
+                'min:8',               // على الأقل 8 أحرف
+                'regex:/[A-Z]/',       // حرف كبير
+                'regex:/[0-9]/',       // رقم
+                'confirmed'            // تأكيد كلمة المرور
+            ]
         ], [
-            'token.required' => 'رمز إعادة التعيين مطلوب|Reset token is required',
-            'email.required' => 'البريد الإلكتروني مطلوب|Email is required',
-            'email.email' => 'البريد الإلكتروني غير صحيح|Invalid email format',
-            'email.exists' => 'البريد الإلكتروني غير مسجل لدينا|Email not found in our records',
-            'password.required' => 'كلمة المرور مطلوبة|Password is required',
-            'password.min' => 'كلمة المرور يجب أن تكون 6 أحرف على الأقل|Password must be at least 6 characters',
-            'password.confirmed' => 'كلمة المرور غير متطابقة|Passwords do not match'
+            'email.exists' => 'البريد الإلكتروني غير موجود',
+            'password.regex' => 'كلمة المرور يجب أن تحتوي على حرف كبير ورقم'
         ]);
 
         if ($validator->fails()) {
-            // إذا كان الطلب HTML
-            if ($request->expectsHtml()) {
-                return back()->withErrors($validator)->withInput();
+            if ($request->expectsJson()) {
+                return response()->json(['errors' => $validator->errors()], 422);
             }
-            // إذا كان الطلب API
-            return $this->validationErrorResponse(new ValidationException($validator));
+            return back()->withErrors($validator)->withInput();
         }
 
+        // البحث عن التوكن في جدول email_verifications
         $record = EmailVerification::where('email', $request->email)
             ->where('token', $request->token)
-            ->where('expires_at', '>', now())
             ->first();
 
         if (!$record) {
-            if ($request->expectsHtml()) {
-                return back()->with('error', 'رابط إعادة التعيين غير صالح أو منتهي الصلاحية');
-            }
-            return $this->errorResponse([
-                'ar' => 'رابط إعادة التعيين غير صالح أو منتهي الصلاحية',
-                'en' => 'Invalid or expired reset link'
-            ], 400);
+            return $request->expectsJson()
+                ? response()->json(['message' => 'رابط غير صالح أو منتهي'], 400)
+                : back()->withErrors(['token' => 'رابط غير صالح أو منتهي']);
         }
 
+        // التحقق من صلاحية الرابط
+        if ($record->expires_at->isPast()) {
+            return $request->expectsJson()
+                ? response()->json(['message' => 'انتهت صلاحية الرابط'], 400)
+                : back()->withErrors(['token' => 'انتهت صلاحية الرابط']);
+        }
+
+        // تحديث كلمة المرور
         $user = User::where('email', $request->email)->first();
-        $user->password = bcrypt($request->password);
+        $user->password = Hash::make($request->password);
         $user->save();
 
         // حذف التوكن بعد الاستخدام
         $record->delete();
 
-        if ($request->expectsHtml()) {
-            return view('auth.reset-success'); // صفحة HTML نجاح
+        // إذا كان الطلب من API
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'تم تغيير كلمة المرور بنجاح'
+            ], 200);
         }
 
-        return $this->successResponse([], [
-            'ar' => 'تم تغيير كلمة المرور بنجاح',
-            'en' => 'Password changed successfully'
-        ]);
+        // إذا كان الطلب من صفحة HTML
+        return view('auth.reset-success');
 
     } catch (\Exception $e) {
         Log::error('Reset password error', [
             'error' => $e->getMessage(),
             'trace' => $e->getTraceAsString()
         ]);
-
-        if ($request->expectsHtml()) {
-            return back()->with('error', 'حدث خطأ أثناء إعادة تعيين كلمة المرور');
-        }
-
-        return $this->serverErrorResponse();
+        return $request->expectsJson()
+            ? response()->json(['message' => 'خطأ في الخادم'], 500)
+            : back()->withErrors(['general' => 'حدث خطأ، حاول لاحقًا']);
     }
 }
+
 
 
  public function resendVerification(Request $request)
