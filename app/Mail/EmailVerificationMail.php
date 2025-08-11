@@ -21,7 +21,7 @@ class EmailVerificationMail extends Mailable
     public function build()
     {
         return $this->subject('تحقق من بريدك الإلكتروني - أكاديمية الوردة')
-                   ->view('emails.verification')
+                   ->view('emails.verify_email')
                    ->with([
                        'verificationUrl' => $this->verificationUrl
                    ]);
