@@ -415,7 +415,13 @@ class AuthController extends Controller
     try {
         $user = $request->user();
 
-        // التحقق من البيانات
+        if (!$user) {
+            return $this->errorResponse([
+                'ar' => 'المستخدم غير موجود',
+                'en' => 'User not found'
+            ], 404);
+        }
+
         $validator = Validator::make($request->all(), [
             'name'  => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:20|unique:users,phone,' . $user->id,
@@ -435,24 +441,7 @@ class AuthController extends Controller
             return $this->validationErrorResponse(new ValidationException($validator));
         }
 
-        // تحديث الصورة
-        if ($request->hasFile('image')) {
-        $image      = $request->file('image');
-        $imageName  = uniqid('avatar_') . '.' . $image->getClientOriginalExtension();
-
-        $uploadPath = public_path('uploads/avatars');
-        if (!file_exists($uploadPath)) {
-            mkdir($uploadPath, 0777, true);
-        }
-
-        $image->move($uploadPath, $imageName);
-        $user->image = 'uploads/avatars/' . $imageName;
-    }
-
-        // حفظ الصورة
-        $user->save();
-
-        // تحديث البيانات الأخرى
+        // تحديث البيانات
         if ($request->filled('name')) {
             $user->name = $request->name;
         }
@@ -460,27 +449,29 @@ class AuthController extends Controller
             $user->phone = $request->phone;
         }
 
-        // حفظ التغييرات
-        try {
-            $user->save();
-            Log::info('User profile updated', [
-                'user_id' => $user->id
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Profile save failed', [
-                'user_id' => $user->id,
-                'error'   => $e->getMessage()
-            ]);
-            return $this->errorResponse([
-                'ar' => 'فشل في حفظ التحديثات',
-                'en' => 'Failed to save updates'
-            ], 500);
+        // تحديث الصورة
+        if ($request->hasFile('image')) {
+            // حذف الصورة القديمة إذا كانت موجودة
+            if ($user->image && file_exists(public_path($user->image))) {
+                unlink(public_path($user->image));
+            }
+
+            $image      = $request->file('image');
+            $imageName  = uniqid('avatar_') . '.' . $image->getClientOriginalExtension();
+            $uploadPath = public_path('uploads/avatars');
+
+            if (!file_exists($uploadPath)) {
+                mkdir($uploadPath, 0777, true);
+            }
+
+            $image->move($uploadPath, $imageName);
+            $user->image = 'uploads/avatars/' . $imageName;
         }
 
-        // إعادة تحميل البيانات
-        $user->refresh();
+        // حفظ التغييرات مرة واحدة
+        $user->save();
 
-        // تجهيز بيانات الإرجاع
+        // إرجاع البيانات المحدثة
         $userData = [
             'id'     => $user->id,
             'name'   => $user->name,
@@ -488,7 +479,7 @@ class AuthController extends Controller
             'phone'  => $user->phone,
             'gender' => $user->gender,
             'role'   => $user->role ?? 'student',
-             'image_url' => url($user->image),
+            'image_url' => $user->image ? url($user->image) : null,
         ];
 
         return $this->successResponse([
@@ -502,7 +493,8 @@ class AuthController extends Controller
         Log::error('Profile update error', [
             'user_id' => $request->user()?->id,
             'error'   => $e->getMessage(),
-            'trace'   => $e->getTraceAsString()
+            'trace'   => $e->getTraceAsString(),
+            'request' => $request->all()
         ]);
         return $this->serverErrorResponse();
     }
