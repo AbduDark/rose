@@ -228,53 +228,72 @@ class AuthController extends Controller
         return response()->json($request->user());
     }
 
-    public function logout(Request $request)
-    {
-        try {
-            $user = $request->user();
+   public function logout(Request $request)
+{
+    try {
+        $user = $request->user();
 
-            if (!$user) {
-                return $this->errorResponse([
-                    'ar' => 'لم يتم العثور على المستخدم',
-                    'en' => 'User not found'
-                ], 401);
-            }
-
-            // Revoke current access token
-            $user->currentAccessToken()->delete();
-
-            // Optional: Revoke all tokens
-            if ($request->has('logout_all_devices') && $request->logout_all_devices) {
-                $user->tokens()->delete();
-            }
-
-            // Clear session if exists
-            if ($user->active_session_id) {
-                $user->update(['active_session_id' => null]);
-            }
-
-            return $this->successResponse([], [
-                'ar' => 'تم تسجيل الخروج بنجاح',
-                'en' => 'Logged out successfully'
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Logout error: ' . $e->getMessage());
-            return $this->serverErrorResponse();
+        if (!$user) {
+            return $this->errorResponse([
+                'ar' => 'لم يتم العثور على المستخدم',
+                'en' => 'User not found'
+            ], 404);
         }
-    }
 
-    public function forceLogout(Request $request)
-    {
+        // تسجيل معلومات تسجيل الخروج
+        Log::info('User logout', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent()
+        ]);
+
+        // إلغاء التوكن الحالي فقط
+        if ($user->currentAccessToken()) {
+            $user->currentAccessToken()->delete();
+        }
+
+        // مسح معرف الجلسة النشطة للجهاز الحالي فقط
+        if ($user->active_session_id) {
+            $user->update(['active_session_id' => null]);
+        }
+
+        return $this->successResponse([], [
+            'ar' => 'تم تسجيل الخروج بنجاح',
+            'en' => 'Logged out successfully'
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('Logout error for user ' . ($user->id ?? 'unknown') . ': ' . $e->getMessage(), [
+            'exception' => $e,
+            'ip' => $request->ip()
+        ]);
+        return $this->serverErrorResponse();
+    }
+}
+
+   public function forceLogout(Request $request)
+{
+    try {
         $request->validate([
             'email' => 'required|email',
-            'password' => 'required',
         ]);
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            return response()->json(['message' => __('messages.auth.invalid_credentials')], 401);
+        if (!$user) {
+            return $this->errorResponse([
+                'ar' => 'لم يتم العثور على المستخدم',
+                'en' => 'User not found'
+            ], 404);
+        }
+
+        // التحقق من التوكن إذا كان مطلوبًا
+        if (!$request->user() || $request->user()->id !== $user->id) {
+            return $this->errorResponse([
+                'ar' => 'غير مصرح بهذا الإجراء',
+                'en' => 'Unauthorized action'
+            ], 403);
         }
 
         // Force logout from all devices
@@ -286,11 +305,24 @@ class AuthController extends Controller
 
         Log::channel('security')->info('Force logout performed', [
             'user_id' => $user->id,
+            'email' => $user->email,
             'ip' => $request->ip(),
+            'user_agent' => $request->userAgent()
         ]);
 
-        return response()->json(['message' => 'Successfully logged out from all devices']);
+        return $this->successResponse([], [
+            'ar' => 'تم تسجيل الخروج من جميع الأجهزة بنجاح',
+            'en' => 'Successfully logged out from all devices'
+        ]);
+
+    } catch (\Exception $e) {
+        Log::channel('security')->error('Force logout error for email ' . ($request->email ?? 'unknown') . ': ' . $e->getMessage(), [
+            'exception' => $e,
+            'ip' => $request->ip()
+        ]);
+        return $this->serverErrorResponse();
     }
+}
 
     public function changePassword(Request $request)
     {
