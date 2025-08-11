@@ -123,17 +123,18 @@ class DatabaseSeeder extends Seeder
         // داتا فيك للاشتراكات
         foreach (User::all() as $user) {
             foreach (Course::all() as $course) {
-                Subscription::create([
-                    'user_id' => $user->id,
-                    'course_id' => $course->id,
-                    'payment_id' => null,
-                    'subscribed_at' => now()->subDays(rand(1, 30)),
-                    'is_active' => true,
-                    'is_approved' => true,
-                    'approved_at' => now()->subDays(rand(1, 30)),
-                    'admin_notes' => 'اشتراك تجريبي'
-                ]);
-            }
+              Subscription::create([
+    'user_id' => $user->id,
+    'course_id' => $course->id,
+    'subscribed_at' => now()->subDays(rand(1, 30)),
+    'is_active' => true,
+    'is_approved' => true,
+    'approved_at' => now()->subDays(rand(1, 30)),
+    'admin_notes' => 'اشتراك تجريبي',
+    'vodafone_number' => '010' . rand(10000000, 99999999),
+    'parent_phone' => '01' . rand(100000000, 999999999), // أضف هذا الحقل
+    // أي حقول أخرى مطلوبة
+]);      }
         }
         // داتا فيك للتقييمات
         foreach (User::all() as $user) {

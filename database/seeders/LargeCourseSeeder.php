@@ -118,16 +118,18 @@ class LargeCourseSeeder extends Seeder
             $randomCourses = collect($courses)->random(rand(1, 5));
 
             foreach ($randomCourses as $course) {
-                Subscription::create([
-                    'user_id' => $user->id,
-                    'course_id' => $course->id,
-                    'payment_id' => null,
-                    'subscribed_at' => now()->subDays(rand(1, 90)),
-                    'is_active' => rand(0, 1) ? true : false,
-                    'is_approved' => rand(0, 1) ? true : false,
-                    'approved_at' => rand(0, 1) ? now()->subDays(rand(1, 30)) : null,
-                    'admin_notes' => rand(0, 1) ? 'اشتراك معتمد' : null,
-                ]);
+               Subscription::create([
+    'user_id' => $user->id,
+    'course_id' => $course->id,
+    'subscribed_at' => now()->subDays(rand(1, 30)),
+    'is_active' => true,
+    'is_approved' => true,
+    'approved_at' => now()->subDays(rand(1, 30)),
+    'admin_notes' => 'اشتراك تجريبي',
+    'vodafone_number' => '010' . rand(10000000, 99999999),
+    'parent_phone' => '01' . rand(100000000, 999999999), // أضف هذا الحقل
+    // أي حقول أخرى مطلوبة
+]);
             }
         }
 
