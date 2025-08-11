@@ -54,10 +54,7 @@ class Subscription extends Model
         return $this->hasMany(Rating::class);
     }
 
-    public function payment()
-    {
-        return $this->belongsTo(Payment::class);
-    }
+
 
     public function approvedBy()
     {
@@ -116,7 +113,7 @@ class Subscription extends Model
         if (!$this->expires_at) {
             return null;
         }
-        
+
         $diff = $this->expires_at->diffInDays(now(), false);
         return $this->expires_at->isFuture() ? $diff : 0;
     }
@@ -126,7 +123,7 @@ class Subscription extends Model
         if (!$this->expires_at) {
             return null;
         }
-        
+
         $diff = $this->expires_at->diffInHours(now(), false);
         return $this->expires_at->isFuture() ? $diff : 0;
     }
@@ -136,7 +133,7 @@ class Subscription extends Model
         if (!$this->expires_at) {
             return false;
         }
-        
+
         return $this->getDaysRemaining() <= $days && !$this->isExpired();
     }
 }

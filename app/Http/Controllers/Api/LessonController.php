@@ -8,7 +8,7 @@ use App\Models\Lesson;
 use App\Models\Course;
 use App\Models\Subscription; // Import Subscription model
 use Illuminate\Http\Request;
-
+use Illuminate\Support\Facades\Log;
 class LessonController extends Controller
 {
     use ApiResponseTrait;
@@ -127,7 +127,7 @@ class LessonController extends Controller
             return $this->successResponse($lesson, __('messages.lesson.retrieved_successfully'));
 
         } catch (\Exception $e) {
-            \Log::error('Error retrieving lesson: ' . $e->getMessage());
+            Log::error('Error retrieving lesson: ' . $e->getMessage());
             return $this->errorResponse(__('messages.general.server_error'), 500);
         }
     }

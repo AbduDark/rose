@@ -3,23 +3,26 @@
 namespace App\Http\Controllers\Api;
 
 use Illuminate\Routing\Controller;
+
 use Illuminate\Routing\Controller as BaseController; // Add this line
 use App\Traits\ApiResponseTrait;
 use App\Models\User;
 use App\Models\Course;
 use App\Models\Subscription;
-use App\Models\Payment;
 use App\Models\Lesson;
+use App\Models\Comment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\MessageBag;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Carbon\Carbon;
-use Auth;
+use Illuminate\Support\Facades\Auth;
 
-class AdminController extends Controller
+
+class AdminController extends BaseController
 {
     use ApiResponseTrait;
 
@@ -318,7 +321,7 @@ class AdminController extends Controller
             ]);
 
             if ($validator->fails()) {
-                return $this->validationErrorResponse($validator->errors());
+                return $this->validationErrorResponse(new ValidationException($validator));
             }
 
             $subscription = Subscription::findOrFail($id);
@@ -395,7 +398,11 @@ class AdminController extends Controller
 
             $lesson = Lesson::create($request->all());
 
-            return $this->successResponse($lesson, __('messages.lesson.created_successfully'), 201);
+            return $this->successResponse($lesson, [
+    'ar' => 'تم إنشاء الدرس بنجاح',
+    'en' => 'Lesson created successfully'
+    ]                   , 201);
+
 
         } catch (\Exception $e) {
             Log::error('Error creating lesson: ' . $e->getMessage());
@@ -429,7 +436,10 @@ class AdminController extends Controller
 
             $lesson->update($request->all());
 
-            return $this->successResponse($lesson, __('messages.lesson.updated_successfully'));
+            return $this->successResponse($lesson, [
+                'ar' => 'تم تحديث الدرس بنجاح',
+                'en' => 'Lesson Updated successfully'
+            ], 201);
 
         } catch (\Exception $e) {
             Log::error('Error updating lesson: ' . $e->getMessage());

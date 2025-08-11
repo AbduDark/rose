@@ -1,4 +1,3 @@
-
 <?php
 
 namespace App\Console\Commands;
@@ -16,7 +15,7 @@ class SendSubscriptionReminders extends Command
     {
         // تذكير 3 أيام قبل الانتهاء
         $this->sendReminders(3);
-        
+
         // تذكير يوم واحد قبل الانتهاء
         $this->sendReminders(1);
 
@@ -26,7 +25,7 @@ class SendSubscriptionReminders extends Command
     private function sendReminders($days)
     {
         $targetDate = now()->addDays($days)->format('Y-m-d');
-        
+
         $expiringSubscriptions = Subscription::where('is_active', true)
             ->where('status', 'approved')
             ->whereDate('expires_at', $targetDate)
@@ -34,8 +33,8 @@ class SendSubscriptionReminders extends Command
 
         foreach ($expiringSubscriptions as $subscription) {
             NotificationService::subscriptionExpiringReminder(
-                $subscription->user_id, 
-                $subscription->course_id, 
+                $subscription->user_id,
+                $subscription->course_id,
                 $days
             );
         }

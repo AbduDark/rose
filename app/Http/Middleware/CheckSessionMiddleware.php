@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
+use App\Models\User; // تمت إضافة الاستيراد
 
 class CheckSessionMiddleware
 {
@@ -15,11 +16,14 @@ class CheckSessionMiddleware
         if (!Auth::check()) {
             return response()->json([
                 'success' => false,
-                'message' => 'يجب تسجيل الدخول أولاً'
+                'message' => [
+                    'ar' => 'يجب تسجيل الدخول أولاً',
+                    'en' => 'You must be logged in first'
+                ]
             ], 401);
         }
 
-        // التحقق من أن المستخدم لا يستخدم أكثر من جلسة واحدة
+        /** @var User $user */
         $user = Auth::user();
         $currentSession = session()->getId();
 
@@ -32,15 +36,19 @@ class CheckSessionMiddleware
 
             return response()->json([
                 'success' => false,
-                'message' => 'تم تسجيل دخولك من جهاز آخر. يرجى تسجيل الدخول مرة أخرى.',
+                'message' => [
+                    'ar' => 'تم تسجيل دخولك من جهاز آخر. يرجى تسجيل الدخول مرة أخرى.',
+                    'en' => 'You are logged in from another device. Please log in again.'
+                ],
                 'error_code' => 'MULTIPLE_SESSIONS'
             ], 403);
         }
 
         // تحديث معرف الجلسة للمستخدم
         if ($user->current_session !== $currentSession) {
-            $user->current_session = $currentSession;
-            $user->save();
+            $user->forceFill([
+                'current_session' => $currentSession
+            ])->save();
         }
 
         return $next($request);

@@ -1,4 +1,3 @@
-
 <?php
 
 namespace App\Services;
@@ -31,7 +30,7 @@ class NotificationService
     public static function sendToUsers($userIds, $title, $message, $type = 'general', $courseId = null, $senderId = null, $data = null)
     {
         $notifications = [];
-        
+
         foreach ($userIds as $userId) {
             $notifications[] = self::sendToUser($userId, $title, $message, $type, $courseId, $senderId, $data);
         }
@@ -93,7 +92,7 @@ class NotificationService
     public static function subscriptionApproved($userId, $courseId)
     {
         $course = Course::find($courseId);
-        
+
         return self::sendToUser(
             $userId,
             'تم قبول اشتراكك',
@@ -112,11 +111,11 @@ class NotificationService
     {
         $course = Course::find($courseId);
         $message = "تم رفض اشتراكك في كورس: {$course->title}.";
-        
+
         if ($reason) {
             $message .= " السبب: {$reason}";
         }
-        
+
         return self::sendToUser(
             $userId,
             'تم رفض اشتراكك',
@@ -134,7 +133,7 @@ class NotificationService
     public static function subscriptionExpired($userId, $courseId)
     {
         $course = Course::find($courseId);
-        
+
         return self::sendToUser(
             $userId,
             'انتهت صلاحية اشتراكك',
@@ -152,7 +151,7 @@ class NotificationService
     public static function newLessonAdded($courseId, $lessonTitle)
     {
         $course = Course::find($courseId);
-        
+
         return self::sendToCourseStudents(
             $courseId,
             'درس جديد متاح',
@@ -169,7 +168,7 @@ class NotificationService
     public static function subscriptionExpiringReminder($userId, $courseId, $daysRemaining)
     {
         $course = Course::find($courseId);
-        
+
         return self::sendToUser(
             $userId,
             'تذكير: اشتراكك على وشك الانتهاء',

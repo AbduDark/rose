@@ -67,10 +67,7 @@ class Course extends Model
         return $query->where('is_active', true);
     }
 
-    public function payments()
-    {
-        return $this->hasMany(Payment::class);
-    }
+
 
     public function averageRating()
     {

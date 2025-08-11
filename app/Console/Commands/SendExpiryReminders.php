@@ -1,4 +1,3 @@
-
 <?php
 
 namespace App\Console\Commands;
@@ -22,7 +21,7 @@ class SendExpiryReminders extends Command
 
         foreach ($subscriptionsExpiringSoon as $subscription) {
             $daysRemaining = $subscription->getDaysRemaining();
-            
+
             // هنا يمكنك إضافة إرسال إشعار أو بريد إلكتروني
             $this->info("تذكير: اشتراك {$subscription->user->name} في كورس {$subscription->course->title} سينتهي خلال {$daysRemaining} يوم");
         }

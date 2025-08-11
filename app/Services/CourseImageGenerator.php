@@ -3,9 +3,15 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\{Log, Storage};
+use Intervention\Image\Facades\Image;
+
 
 class CourseImageGenerator
 {
+    /**
+     * قائمة القوالب المتاحة
+     */
+    
     private array $templates = [
         'template1.jpg',
         'template2.jpg',

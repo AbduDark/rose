@@ -10,12 +10,14 @@ use App\Traits\ApiResponseTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
+
 
 class SubscriptionController extends Controller
 {
     use ApiResponseTrait;
 
-    public function subscribe(Request $request)
+   public function subscribe(Request $request)
     {
         try {
             $validator = Validator::make($request->all(), [
@@ -26,7 +28,7 @@ class SubscriptionController extends Controller
             ]);
 
             if ($validator->fails()) {
-                return $this->validationErrorResponse($validator->errors());
+                throw new ValidationException($validator);
             }
 
             $user = Auth::user();
@@ -72,6 +74,8 @@ class SubscriptionController extends Controller
                 'en' => 'Subscription request sent successfully, it will be reviewed by administration'
             ]);
 
+    } catch (ValidationException $e) {
+     return $this->validationErrorResponse($e);
         } catch (\Exception $e) {
             return $this->serverErrorResponse();
         }
@@ -142,8 +146,8 @@ class SubscriptionController extends Controller
                 'admin_notes' => 'required|string|max:500'
             ]);
 
-            if ($validator->fails()) {
-                return $this->validationErrorResponse($validator->errors());
+             if ($validator->fails()) {
+                throw new ValidationException($validator);
             }
 
             $subscription = Subscription::findOrFail($id);
@@ -175,6 +179,8 @@ class SubscriptionController extends Controller
                 'en' => 'Subscription request rejected'
             ]);
 
+          } catch (ValidationException $e) {
+            return $this->validationErrorResponse($e);
         } catch (\Exception $e) {
             return $this->serverErrorResponse();
         }
@@ -212,7 +218,7 @@ class SubscriptionController extends Controller
             ]);
 
             if ($validator->fails()) {
-                return $this->validationErrorResponse($validator->errors());
+                throw new ValidationException($validator);
             }
 
             $user = Auth::user();
@@ -243,6 +249,8 @@ class SubscriptionController extends Controller
                 'en' => 'Subscription renewal request sent successfully, it will be reviewed by administration'
             ]);
 
+       } catch (ValidationException $e) {
+            return $this->validationErrorResponse($e);
         } catch (\Exception $e) {
             return $this->serverErrorResponse();
         }

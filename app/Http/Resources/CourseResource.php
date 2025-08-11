@@ -4,11 +4,14 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Auth; // تمت إضافة الاستيراد
 
 class CourseResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $user = Auth::user(); // الحصول على المستخدم الحالي مرة واحدة
+
         return [
             'id' => $this->id,
             'title' => $this->title,
@@ -23,12 +26,12 @@ class CourseResource extends JsonResource
             'lessons_count' => $this->lessons_count ?? $this->lessons()->count(),
             'avg_rating' => $this->avg_rating ?? $this->ratings()->avg('rating'),
             'is_subscribed' => $this->when(
-                auth()->check(),
-                fn() => $this->subscriptions()->where('user_id', auth()->id())->exists()
+                $user !== null,
+                fn() => $this->subscriptions()->where('user_id', $user->id)->exists()
             ),
             'is_favorite' => $this->when(
-                auth()->check(),
-                fn() => $this->favorites()->where('user_id', auth()->id())->exists()
+                $user !== null,
+                fn() => $this->favorites()->where('user_id', $user->id)->exists()
             ),
             'created_at' => $this->created_at,
         ];

@@ -1,4 +1,3 @@
-
 <?php
 
 namespace App\Http\Middleware;
@@ -14,7 +13,7 @@ class CheckSubscription
     public function handle(Request $request, Closure $next)
     {
         $user = $request->user();
-        
+
         // Allow admins to access everything
         if ($user && $user->isAdmin()) {
             return $next($request);
@@ -22,7 +21,7 @@ class CheckSubscription
 
         // Get course_id from route parameters
         $courseId = $request->route('course') ?? $request->route('id');
-        
+
         if (!$courseId || !$user) {
             return $this->errorResponse([
                 'ar' => 'غير مصرح لك بالوصول',
@@ -46,7 +45,7 @@ class CheckSubscription
         // Check if subscription is expired
         if ($subscription->isExpired()) {
             $daysExpired = now()->diffInDays($subscription->expires_at);
-            
+
             return $this->errorResponse([
                 'ar' => "انتهت صلاحية اشتراكك في هذا الكورس منذ {$daysExpired} يوم. يرجى تجديد اشتراكك للمتابعة.",
                 'en' => "Your subscription to this course expired {$daysExpired} days ago. Please renew your subscription to continue."

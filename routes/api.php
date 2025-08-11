@@ -91,9 +91,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('ratings',                     [RatingController::class, 'store']);
 
     // Payments
-    Route::get('courses/{courseId}/payment-form', [PaymentController::class, 'getPaymentForm']);
-    Route::post('payments/vodafone',           [PaymentController::class, 'submitVodafonePayment']);
-    Route::get('payments/history',             [PaymentController::class, 'getUserPaymentHistory']);
+
+
 });
 
 // Admin Routes (Protected)

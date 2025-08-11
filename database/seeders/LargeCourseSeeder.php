@@ -1,4 +1,3 @@
-
 <?php
 
 namespace Database\Seeders;
@@ -91,7 +90,7 @@ class LargeCourseSeeder extends Seeder
         // إنشاء الدروس لكل كورس
         foreach ($courses as $courseIndex => $course) {
             $lessonsCount = rand(5, 15);
-            
+
             for ($i = 1; $i <= $lessonsCount; $i++) {
                 $targetGender = 'both';
                 if ($i % 3 == 0) {
@@ -117,7 +116,7 @@ class LargeCourseSeeder extends Seeder
         // إنشاء اشتراكات عشوائية
         foreach ($users as $user) {
             $randomCourses = collect($courses)->random(rand(1, 5));
-            
+
             foreach ($randomCourses as $course) {
                 Subscription::create([
                     'user_id' => $user->id,
@@ -133,34 +132,12 @@ class LargeCourseSeeder extends Seeder
         }
 
         // إنشاء دفعات مالية
-        foreach ($users as $user) {
-            $userCourses = collect($courses)->random(rand(1, 3));
-            
-            foreach ($userCourses as $course) {
-                $statuses = ['pending', 'approved', 'rejected'];
-                Payment::create([
-                    'user_id' => $user->id,
-                    'course_id' => $course->id,
-                    'amount' => $course->price,
-                    'currency' => 'EGP',
-                    'payment_method' => 'vodafone_cash',
-                    'vodafone_number' => '01012345678',
-                    'sender_number' => $user->phone,
-                    'transaction_reference' => 'TXN_' . time() . '_' . rand(1000, 9999),
-                    'status' => $statuses[array_rand($statuses)],
-                    'payment_data' => json_encode([
-                        'submitted_at' => now()->subDays(rand(1, 30)),
-                        'test_data' => true,
-                        'user_agent' => 'Mozilla/5.0 Test Browser'
-                    ])
-                ]);
-            }
-        }
+       
 
         // إنشاء تقييمات عشوائية
         foreach ($users as $user) {
             $randomCourses = collect($courses)->random(rand(1, 8));
-            
+
             foreach ($randomCourses as $course) {
                 $reviews = [
                     'كورس ممتاز جداً، استفدت كثيراً',
@@ -185,7 +162,7 @@ class LargeCourseSeeder extends Seeder
         // إنشاء مفضلة عشوائية
         foreach ($users as $user) {
             $randomCourses = collect($courses)->random(rand(2, 6));
-            
+
             foreach ($randomCourses as $course) {
                 Favorite::create([
                     'user_id' => $user->id,
@@ -198,7 +175,7 @@ class LargeCourseSeeder extends Seeder
         $allLessons = Lesson::all();
         foreach ($users as $user) {
             $randomLessons = $allLessons->random(rand(5, 15));
-            
+
             foreach ($randomLessons as $lesson) {
                 $comments = [
                     'شرح ممتاز، شكراً لكم',
@@ -226,7 +203,6 @@ class LargeCourseSeeder extends Seeder
         $this->command->info('- 20 كورس (مع توليد صور تلقائية)');
         $this->command->info('- ' . Lesson::count() . ' درس');
         $this->command->info('- ' . Subscription::count() . ' اشتراك');
-        $this->command->info('- ' . Payment::count() . ' دفعة مالية');
         $this->command->info('- ' . Rating::count() . ' تقييم');
         $this->command->info('- ' . Favorite::count() . ' مفضلة');
         $this->command->info('- ' . Comment::count() . ' تعليق');

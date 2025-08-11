@@ -1,4 +1,3 @@
-
 <?php
 
 namespace App\Http\Controllers\Api;
@@ -49,7 +48,7 @@ class NotificationController extends Controller
     {
         try {
             $user = Auth::user();
-            
+
             $notification = Notification::forUser($user->id)
                 ->with(['course:id,title', 'sender:id,name'])
                 ->findOrFail($id);
@@ -72,7 +71,7 @@ class NotificationController extends Controller
     {
         try {
             $user = Auth::user();
-            
+
             $notification = Notification::forUser($user->id)->findOrFail($id);
             $notification->markAsRead();
 
@@ -89,7 +88,7 @@ class NotificationController extends Controller
     {
         try {
             $user = Auth::user();
-            
+
             Notification::forUser($user->id)
                 ->unread()
                 ->update([
@@ -125,7 +124,7 @@ class NotificationController extends Controller
     {
         try {
             $user = Auth::user();
-            
+
             $notification = Notification::forUser($user->id)->findOrFail($id);
             $notification->delete();
 
@@ -142,7 +141,7 @@ class NotificationController extends Controller
     {
         try {
             // التحقق من أن المستخدم إدارة
-            if (!Auth::user()->isAdmin()) {
+            if (!Auth::user()->Role === 'admin') {
                 return $this->errorResponse('ليس لديك صلاحية لهذا الإجراء', 403);
             }
 
@@ -168,12 +167,12 @@ class NotificationController extends Controller
             if ($request->send_to_all) {
                 // إرسال لجميع الطلبة
                 $usersQuery = User::where('role', 'student');
-                
+
                 // فلترة حسب الجنس إذا تم تحديده
                 if ($request->gender) {
                     $usersQuery->where('gender', $request->gender);
                 }
-                
+
                 $users = $usersQuery->get();
             } elseif ($request->course_id) {
                 // إرسال لطلبة كورس محدد
@@ -182,22 +181,22 @@ class NotificationController extends Controller
                           ->where('is_active', true)
                           ->where('status', 'approved');
                 });
-                
+
                 // فلترة حسب الجنس إذا تم تحديده
                 if ($request->gender) {
                     $usersQuery->where('gender', $request->gender);
                 }
-                
+
                 $users = $usersQuery->get();
             } else {
                 // إرسال لمستخدمين محددين
                 $usersQuery = User::whereIn('id', $request->user_ids ?? []);
-                
+
                 // فلترة حسب الجنس إذا تم تحديده
                 if ($request->gender) {
                     $usersQuery->where('gender', $request->gender);
                 }
-                
+
                 $users = $usersQuery->get();
             }
 
@@ -230,7 +229,7 @@ class NotificationController extends Controller
     public function statistics()
     {
         try {
-            if (!Auth::user()->isAdmin()) {
+            if (!Auth::user()->Role === 'admin') {
                 return $this->errorResponse('ليس لديك صلاحية لهذا الإجراء', 403);
             }
 

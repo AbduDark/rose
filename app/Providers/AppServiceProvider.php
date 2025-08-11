@@ -3,18 +3,14 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use App\Services\VodafoneCashService;
 
 class AppServiceProvider extends ServiceProvider
 {
     /**
      * Register any application services.
      */
-    public function register(): void
-    {
-        $this->app->singleton(\App\Services\VodafoneCashService::class, function ($app) {
-            return new \App\Services\VodafoneCashService();
-        });
-    }
+
 
     /**
      * Bootstrap any application services.
