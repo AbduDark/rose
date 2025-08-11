@@ -439,15 +439,30 @@ class AuthController extends Controller
         ]);
 
         // Handle image upload
-        if ($request->hasFile('image')) {
-            // Delete old image if exists
-            if ($user->image && Storage::disk('public')->exists($user->image)) {
-                Storage::disk('public')->delete($user->image);
-            }
+       if ($request->hasFile('image')) {
+    $image = $request->file('image');
 
-            $path = $request->file('image')->store('uploads/avatars', 'public');
-            $updateData['image'] = $path;
-        }
+    // حذف الصورة القديمة إذا كانت موجودة
+    if ($user->image && file_exists(public_path($user->image))) {
+        @unlink(public_path($user->image));
+    }
+
+    // اسم الملف الجديد
+    $imageName = uniqid('avatar_') . '.' . $image->getClientOriginalExtension();
+    $uploadPath = public_path('uploads/avatars');
+
+    // إنشاء المجلد إذا لم يكن موجود
+    if (!file_exists($uploadPath)) {
+        mkdir($uploadPath, 0755, true);
+    }
+
+    // نقل الصورة
+    $image->move($uploadPath, $imageName);
+
+    // حفظ المسار في قاعدة البيانات
+    $updateData['image'] = 'uploads/avatars/' . $imageName;
+}
+
 
         // Update user
         $user->update($updateData);
@@ -461,7 +476,7 @@ class AuthController extends Controller
                 'phone'     => $user->phone,
                 'gender'    => $user->gender,
                 'role'      => $user->role ?? 'student',
-                'image_url' => $user->image ? Storage::url($user->image) : null,
+                'image_url' => $user->image ?  url($user->image) : null,
             ]
         ], [
             'ar' => 'تم تحديث الملف الشخصي بنجاح',
