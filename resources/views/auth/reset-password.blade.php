@@ -76,6 +76,24 @@
 
 <div class="container">
     <h2>إعادة تعيين كلمة المرور</h2>
+     {{-- عرض الأخطاء --}}
+    @if ($errors->any())
+        <div style="background-color: #ffe6e6; color: #c0392b; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
+            <ul style="margin: 0; padding-left: 20px;">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    {{-- عرض رسالة النجاح --}}
+    @if (session('success'))
+        <div style="background-color: #e8f8f5; color: #27ae60; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
+            {{ session('success') }}
+        </div>
+    @endif
+
 
     <form id="resetForm" method="POST" action="{{ url('/api/auth/reset-password') }}">
         @csrf
