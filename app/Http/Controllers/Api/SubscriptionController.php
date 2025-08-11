@@ -1,149 +1,196 @@
+
 <?php
 
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Subscription;
 use App\Models\Course;
-use App\Models\Payment;
+use App\Models\Subscription;
+use App\Traits\ApiResponseTrait;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
 
 class SubscriptionController extends Controller
 {
-    public function index(Request $request)
+    use ApiResponseTrait;
+
+    public function subscribe(Request $request)
     {
-        $subscriptions = $request->user()
-            ->subscriptions()
-            ->with('course')
-            ->where('is_active', true)
-            ->where('is_approved', true)
-            ->where('expires_at', '>', now())
-            ->get();
+        try {
+            $validator = Validator::make($request->all(), [
+                'course_id' => 'required|exists:courses,id',
+                'vodafone_number' => 'required|string|regex:/^01[0-2]\d{8}$/',
+                'parent_phone' => 'required|string|regex:/^01[0-2]\d{8}$/',
+                'student_info' => 'nullable|string|max:1000'
+            ]);
 
-        return response()->json($subscriptions);
-    }
+            if ($validator->fails()) {
+                return $this->validationErrorResponse($validator->errors());
+            }
 
-    public function store(Request $request)
-    {
-        $request->validate([
-            'course_id' => 'required|exists:courses,id',
-        ]);
+            $user = Auth::user();
+            $course = Course::find($request->course_id);
 
-        $user = $request->user();
-        $courseId = $request->course_id;
+            // Check if already subscribed
+            $existingSubscription = Subscription::where('user_id', $user->id)
+                ->where('course_id', $request->course_id)
+                ->first();
 
-        // Check if already subscribed
-        $existingSubscription = Subscription::where('user_id', $user->id)
-            ->where('course_id', $courseId)
-            ->where('is_active', true)
-            ->where('expires_at', '>', now())
-            ->first();
+            if ($existingSubscription) {
+                if ($existingSubscription->status === 'pending') {
+                    return $this->errorResponse([
+                        'ar' => 'لديك طلب اشتراك قيد المراجعة بالفعل',
+                        'en' => 'You already have a pending subscription request'
+                    ], 400);
+                }
+                
+                if ($existingSubscription->status === 'approved' && $existingSubscription->is_active) {
+                    return $this->errorResponse([
+                        'ar' => 'أنت مشترك بالفعل في هذا الكورس',
+                        'en' => 'You are already subscribed to this course'
+                    ], 400);
+                }
+            }
 
-        if ($existingSubscription) {
-            return response()->json([
-                'message' => 'أنت مشترك بالفعل في هذه الدورة'
-            ], 400);
+            $subscription = Subscription::create([
+                'user_id' => $user->id,
+                'course_id' => $request->course_id,
+                'vodafone_number' => $request->vodafone_number,
+                'parent_phone' => $request->parent_phone,
+                'student_info' => $request->student_info,
+                'status' => 'pending',
+                'is_active' => false,
+                'is_approved' => false,
+                'subscribed_at' => now()
+            ]);
+
+            return $this->successResponse([
+                'subscription' => $subscription->load(['course', 'user'])
+            ], [
+                'ar' => 'تم إرسال طلب الاشتراك بنجاح، سيتم مراجعته من قبل الإدارة',
+                'en' => 'Subscription request sent successfully, it will be reviewed by administration'
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->serverErrorResponse();
         }
-
-        // Create pending subscription (requires payment approval)
-        $subscription = Subscription::create([
-            'user_id' => $user->id,
-            'course_id' => $courseId,
-            'subscribed_at' => now(),
-            'expires_at' => now()->addDays(30),
-            'is_active' => false, // Will be activated after payment approval
-            'is_approved' => false,
-        ]);
-
-        return response()->json([
-            'message' => 'تم إنشاء طلب الاشتراك. يرجى الدفع وانتظار موافقة الإدارة',
-            'subscription' => $subscription
-        ], 201);
     }
 
-    public function destroy($courseId, Request $request)
+    public function mySubscriptions()
     {
-        $subscription = Subscription::where('user_id', $request->user()->id)
-            ->where('course_id', $courseId)
-            ->where('is_active', true)
-            ->first();
+        try {
+            $user = Auth::user();
+            $subscriptions = Subscription::where('user_id', $user->id)
+                ->with(['course', 'approvedBy', 'rejectedBy'])
+                ->orderBy('created_at', 'desc')
+                ->get();
 
-        if (!$subscription) {
-            return response()->json(['message' => 'الاشتراك غير موجود'], 404);
+            return $this->successResponse([
+                'subscriptions' => $subscriptions
+            ], [
+                'ar' => 'تم جلب اشتراكاتك بنجاح',
+                'en' => 'Your subscriptions retrieved successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->serverErrorResponse();
         }
-
-        $subscription->update(['is_active' => false]);
-
-        return response()->json(['message' => 'تم إلغاء الاشتراك بنجاح']);
     }
 
-    // Admin functions
-    public function approveSubscription(Request $request, $subscriptionId)
+    public function approve(Request $request, $id)
     {
-        $subscription = Subscription::findOrFail($subscriptionId);
+        try {
+            $subscription = Subscription::findOrFail($id);
+            
+            if ($subscription->status !== 'pending') {
+                return $this->errorResponse([
+                    'ar' => 'هذا الطلب تم التعامل معه مسبقاً',
+                    'en' => 'This request has already been processed'
+                ], 400);
+            }
 
-        $subscription->update([
-            'is_approved' => true,
-            'is_active' => true,
-            'approved_at' => now(),
-            'admin_notes' => $request->admin_notes,
-        ]);
+            $subscription->update([
+                'status' => 'approved',
+                'is_approved' => true,
+                'is_active' => true,
+                'approved_at' => now(),
+                'approved_by' => Auth::id(),
+                'admin_notes' => $request->get('admin_notes')
+            ]);
 
-        return response()->json([
-            'message' => 'تم الموافقة على الاشتراك',
-            'subscription' => $subscription
-        ]);
-    }
+            return $this->successResponse([
+                'subscription' => $subscription->load(['course', 'user', 'approvedBy'])
+            ], [
+                'ar' => 'تم قبول طلب الاشتراك بنجاح',
+                'en' => 'Subscription request approved successfully'
+            ]);
 
-    public function rejectSubscription(Request $request, $subscriptionId)
-    {
-        $subscription = Subscription::findOrFail($subscriptionId);
-
-        $subscription->update([
-            'is_approved' => false,
-            'is_active' => false,
-            'admin_notes' => $request->admin_notes,
-        ]);
-
-        return response()->json([
-            'message' => 'تم رفض الاشتراك',
-            'subscription' => $subscription
-        ]);
-    }
-
-    public function pendingSubscriptions()
-    {
-        $subscriptions = Subscription::with(['user', 'course'])
-            ->where('is_approved', false)
-            ->where('is_active', false)
-            ->get();
-
-        return response()->json($subscriptions);
-    }
-
-    public function renewSubscription(Request $request, $courseId)
-    {
-        $user = $request->user();
-
-        $subscription = Subscription::where('user_id', $user->id)
-            ->where('course_id', $courseId)
-            ->where('is_approved', true)
-            ->first();
-
-        if (!$subscription) {
-            return response()->json(['message' => 'الاشتراك غير موجود'], 404);
+        } catch (\Exception $e) {
+            return $this->serverErrorResponse();
         }
+    }
 
-        // Extend subscription by 30 days
-        $subscription->update([
-            'expires_at' => $subscription->expires_at->addDays(30),
-            'is_active' => false, // Requires new payment approval
-            'is_approved' => false,
-        ]);
+    public function reject(Request $request, $id)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'admin_notes' => 'required|string|max:500'
+            ]);
 
-        return response()->json([
-            'message' => 'تم تجديد الاشتراك. يرجى الدفع وانتظار موافقة الإدارة',
-            'subscription' => $subscription
-        ]);
+            if ($validator->fails()) {
+                return $this->validationErrorResponse($validator->errors());
+            }
+
+            $subscription = Subscription::findOrFail($id);
+            
+            if ($subscription->status !== 'pending') {
+                return $this->errorResponse([
+                    'ar' => 'هذا الطلب تم التعامل معه مسبقاً',
+                    'en' => 'This request has already been processed'
+                ], 400);
+            }
+
+            $subscription->update([
+                'status' => 'rejected',
+                'is_approved' => false,
+                'is_active' => false,
+                'rejected_at' => now(),
+                'rejected_by' => Auth::id(),
+                'admin_notes' => $request->admin_notes
+            ]);
+
+            return $this->successResponse([
+                'subscription' => $subscription->load(['course', 'user', 'rejectedBy'])
+            ], [
+                'ar' => 'تم رفض طلب الاشتراك',
+                'en' => 'Subscription request rejected'
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->serverErrorResponse();
+        }
+    }
+
+    public function cancelSubscription($id)
+    {
+        try {
+            $user = Auth::user();
+            $subscription = Subscription::where('user_id', $user->id)
+                ->where('id', $id)
+                ->firstOrFail();
+
+            $subscription->update([
+                'is_active' => false
+            ]);
+
+            return $this->successResponse(null, [
+                'ar' => 'تم إلغاء الاشتراك بنجاح',
+                'en' => 'Subscription cancelled successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->serverErrorResponse();
+        }
     }
 }

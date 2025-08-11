@@ -1,5 +1,5 @@
 modules = ["php-8.2", "web", "nodejs-20"]
-run = "php artisan serve"
+
 
 [nix]
 channel = "stable-25_05"

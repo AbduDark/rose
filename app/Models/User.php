@@ -74,9 +74,15 @@ class User extends Authenticatable
 
     public function isSubscribedTo($courseId)
     {
+        // Admins have access to all courses
+        if ($this->isAdmin()) {
+            return true;
+        }
+        
         return $this->subscriptions()
                     ->where('course_id', $courseId)
                     ->where('is_active', true)
+                    ->where('status', 'approved')
                     ->exists();
     }
 

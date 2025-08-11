@@ -238,22 +238,14 @@ class AdminController extends Controller
     public function getSubscriptions(Request $request)
     {
         try {
-            $query = Subscription::with(['user', 'course']);
+            $query = Subscription::with(['user', 'course', 'approvedBy', 'rejectedBy']);
 
             if ($request->has('status')) {
-                if ($request->get('status') === 'active') {
-                    $query->where('is_active', true);
-                } else {
-                    $query->where('is_active', false);
-                }
+                $query->where('status', $request->get('status'));
             }
 
-            if ($request->has('approved')) {
-                if ($request->get('approved') === 'true') {
-                    $query->where('is_approved', true);
-                } else {
-                    $query->where('is_approved', false);
-                }
+            if ($request->has('course_id')) {
+                $query->where('course_id', $request->get('course_id'));
             }
 
             $subscriptions = $query->orderBy('created_at', 'desc')
@@ -262,6 +254,128 @@ class AdminController extends Controller
             return $this->successResponse($subscriptions, [
                 'ar' => 'تم جلب قائمة الاشتراكات بنجاح',
                 'en' => 'Subscriptions retrieved successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Admin get subscriptions error: ' . $e->getMessage());
+            return $this->serverErrorResponse();
+        }
+    }
+
+    public function getPendingSubscriptions(Request $request)
+    {
+        try {
+            $subscriptions = Subscription::pending()
+                ->with(['user', 'course'])
+                ->orderBy('created_at', 'asc')
+                ->paginate($request->get('per_page', 15));
+
+            return $this->successResponse($subscriptions, [
+                'ar' => 'تم جلب طلبات الاشتراك المعلقة بنجاح',
+                'en' => 'Pending subscription requests retrieved successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Admin get pending subscriptions error: ' . $e->getMessage());
+            return $this->serverErrorResponse();
+        }
+    }
+
+    public function approveSubscription(Request $request, $id)
+    {
+        try {
+            $subscription = Subscription::findOrFail($id);
+            
+            if ($subscription->status !== 'pending') {
+                return $this->errorResponse([
+                    'ar' => 'هذا الطلب تم التعامل معه مسبقاً',
+                    'en' => 'This request has already been processed'
+                ], 400);
+            }
+
+            $subscription->update([
+                'status' => 'approved',
+                'is_approved' => true,
+                'is_active' => true,
+                'approved_at' => now(),
+                'approved_by' => Auth::id(),
+                'admin_notes' => $request->get('admin_notes')
+            ]);
+
+            return $this->successResponse([
+                'subscription' => $subscription->load(['course', 'user', 'approvedBy'])
+            ], [
+                'ar' => 'تم قبول طلب الاشتراك بنجاح',
+                'en' => 'Subscription request approved successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Admin approve subscription error: ' . $e->getMessage());
+            return $this->serverErrorResponse();
+        }
+    }
+
+    public function rejectSubscription(Request $request, $id)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'admin_notes' => 'required|string|max:500'
+            ]);
+
+            if ($validator->fails()) {
+                return $this->validationErrorResponse($validator->errors());
+            }
+
+            $subscription = Subscription::findOrFail($id);
+            
+            if ($subscription->status !== 'pending') {
+                return $this->errorResponse([
+                    'ar' => 'هذا الطلب تم التعامل معه مسبقاً',
+                    'en' => 'This request has already been processed'
+                ], 400);
+            }
+
+            $subscription->update([
+                'status' => 'rejected',
+                'is_approved' => false,
+                'is_active' => false,
+                'rejected_at' => now(),
+                'rejected_by' => Auth::id(),
+                'admin_notes' => $request->admin_notes
+            ]);
+
+            return $this->successResponse([
+                'subscription' => $subscription->load(['course', 'user', 'rejectedBy'])
+            ], [
+                'ar' => 'تم رفض طلب الاشتراك',
+                'en' => 'Subscription request rejected'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Admin reject subscription error: ' . $e->getMessage());
+            return $this->serverErrorResponse();
+        }
+    }
+
+    // إدارة التعليقات
+    public function getPendingComments(Request $request)
+    {
+        try {
+            $comments = Comment::where('is_approved', false)
+                ->with(['user', 'lesson.course'])
+                ->orderBy('created_at', 'asc')
+                ->paginate($request->get('per_page', 15));
+
+            return $this->successResponse($comments, [
+                'ar' => 'تم جلب التعليقات المعلقة بنجاح',
+                'en' => 'Pending comments retrieved successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Admin get pending comments error: ' . $e->getMessage());
+            return $this->serverErrorResponse();
+        }
+    }rieved successfully'
             ]);
 
         } catch (\Exception $e) {

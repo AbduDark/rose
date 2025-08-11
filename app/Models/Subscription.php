@@ -1,3 +1,4 @@
+
 <?php
 
 namespace App\Models;
@@ -13,11 +14,18 @@ class Subscription extends Model
         'user_id',
         'course_id',
         'payment_id',
+        'vodafone_number',
+        'parent_phone',
+        'student_info',
         'subscribed_at',
         'is_active',
         'is_approved',
+        'status',
+        'admin_notes',
         'approved_at',
-        'admin_notes'
+        'rejected_at',
+        'approved_by',
+        'rejected_by'
     ];
 
     protected function casts(): array
@@ -28,6 +36,7 @@ class Subscription extends Model
             'is_active' => 'boolean',
             'is_approved' => 'boolean',
             'approved_at' => 'datetime',
+            'rejected_at' => 'datetime',
         ];
     }
 
@@ -49,5 +58,47 @@ class Subscription extends Model
     public function payment()
     {
         return $this->belongsTo(Payment::class);
+    }
+
+    public function approvedBy()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function rejectedBy()
+    {
+        return $this->belongsTo(User::class, 'rejected_by');
+    }
+
+    // Scopes
+    public function scopePending($query)
+    {
+        return $query->where('status', 'pending');
+    }
+
+    public function scopeApproved($query)
+    {
+        return $query->where('status', 'approved');
+    }
+
+    public function scopeRejected($query)
+    {
+        return $query->where('status', 'rejected');
+    }
+
+    // Helper methods
+    public function isPending()
+    {
+        return $this->status === 'pending';
+    }
+
+    public function isApproved()
+    {
+        return $this->status === 'approved';
+    }
+
+    public function isRejected()
+    {
+        return $this->status === 'rejected';
     }
 }

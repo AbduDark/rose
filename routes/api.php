@@ -56,10 +56,14 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
 
     // Subscriptions
-    Route::get('my-subscriptions', [SubscriptionController::class, 'index']);
-    Route::post('subscribe',       [SubscriptionController::class, 'store']);
-    Route::delete('unsubscribe/{courseId}', [SubscriptionController::class, 'destroy']);
-    Route::post('renew-subscription/{courseId}', [SubscriptionController::class, 'renewSubscription']);
+    Route::post('subscribe', [SubscriptionController::class, 'subscribe']);
+    Route::get('my-subscriptions', [SubscriptionController::class, 'mySubscriptions']);
+    Route::delete('subscriptions/{id}', [SubscriptionController::class, 'cancelSubscription']);
+
+    // Comments
+    Route::post('comments', [CommentController::class, 'store']);
+    Route::get('lessons/{lessonId}/comments', [CommentController::class, 'getLessonComments']);
+    Route::delete('comments/{id}', [CommentController::class, 'destroy']);
 
     // Favorites
     Route::post('favorite/{course_id}',    [FavoriteController::class, 'add']);
@@ -67,8 +71,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     // Lessons & Comments
     Route::get('courses/{id}/lessons',         [LessonController::class, 'index']);
-    Route::post('comments',                    [CommentController::class, 'store']);
-    Route::get('lessons/{lesson_id}/comments', [CommentController::class, 'index']);
+    // Route::post('comments',                    [CommentController::class, 'store']); // Already defined above
+    // Route::get('lessons/{lesson_id}/comments', [CommentController::class, 'index']); // Already defined above
 
     // Ratings
     Route::post('ratings',                     [RatingController::class, 'store']);
@@ -97,7 +101,12 @@ Route::middleware(['auth:sanctum', AdminMiddleware::class])->prefix('admin')->gr
 
         // إدارة الاشتراكات
         Route::get('subscriptions', 'getSubscriptions');
+        Route::get('subscriptions/pending', 'getPendingSubscriptions');
         Route::post('subscriptions/{id}/approve', 'approveSubscription');
         Route::post('subscriptions/{id}/reject', 'rejectSubscription');
+
+        // إدارة التعليقات
+        Route::get('comments/pending', 'getPendingComments');
+        Route::post('comments/{id}/approve', 'approveComment');
     });
 });
