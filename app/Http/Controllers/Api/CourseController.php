@@ -12,16 +12,13 @@ use App\Models\{Course, Subscription, User};
 use App\Http\Resources\CourseResource;
 use App\Services\{CourseImageGenerator, ImageOptimizer};
 
-class CourseController extends Basecontroller
+class CourseController extends BaseController
 {
     use ApiResponseTrait;
 
     public function __construct()
     {
         $this->middleware('auth:sanctum')->except(['index', 'show']);
-        $this->middleware('can:create,course')->only('store');
-        $this->middleware('can:update,course')->only('update');
-        $this->middleware('can:delete,course')->only('destroy');
     }
 
     public function index(Request $request)
@@ -63,7 +60,10 @@ class CourseController extends Basecontroller
 
             return $this->successResponse(
                 CourseResource::collection($courses),
-                __('messages.courses.retrieved')
+                [
+                    'ar' => 'تم جلب الكورسات بنجاح',
+                    'en' => 'Courses retrieved successfully'
+                ]
             );
 
         } catch (\Exception $e) {
@@ -83,7 +83,10 @@ class CourseController extends Basecontroller
                           ->findOrFail($id);
 
             if (!$course->is_active) {
-                return $this->errorResponse(__('messages.courses.not_available'), 404);
+                return $this->errorResponse([
+                    'ar' => 'الكورس غير متاح حالياً',
+                    'en' => 'Course not available'
+                ], 404);
             }
 
             $course->load(['lessons' => function($query) use ($user, $course) {
@@ -115,11 +118,17 @@ class CourseController extends Basecontroller
 
             return $this->successResponse(
                 new CourseResource($course),
-                __('messages.courses.retrieved')
+                [
+                    'ar' => 'تم جلب الكورس بنجاح',
+                    'en' => 'Course retrieved successfully'
+                ]
             );
 
         } catch (ModelNotFoundException $e) {
-            return $this->errorResponse(__('messages.courses.not_found'), 404);
+            return $this->errorResponse([
+                'ar' => 'الكورس غير موجود',
+                'en' => 'Course not found'
+            ], 404);
         } catch (\Exception $e) {
             Log::error('Course show error', [
                 'course_id' => $id,
@@ -133,25 +142,38 @@ class CourseController extends Basecontroller
     public function store(Request $request)
     {
         try {
+            // التحقق من أن المستخدم أدمن
+            if (!$request->user() || !$request->user()->isAdmin()) {
+                return $this->errorResponse([
+                    'ar' => 'غير مصرح لك بإضافة كورس',
+                    'en' => 'Unauthorized to create course'
+                ], 403);
+            }
+
             $validator = Validator::make($request->all(), [
                 'title' => 'required|string|max:255|unique:courses',
                 'description' => 'required|string',
                 'price' => 'required|numeric|min:0',
                 'level' => 'required|in:beginner,intermediate,advanced',
-                'target_gender' => 'required|in:male,female,both',
                 'duration_hours' => 'nullable|integer|min:0',
                 'requirements' => 'nullable|string',
+                'instructor_name' => 'nullable|string|max:255',
+                'language' => 'nullable|string|max:10',
                 'grade' => 'required|in:الاول,الثاني,الثالث',
-                'image' => 'nullable|image|max:2048',
+                'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
             ], [
-                'title.required' => __('validation.courses.title_required'),
-                'description.required' => __('validation.courses.description_required'),
-                'price.required' => __('validation.courses.price_required'),
-                'level.required' => __('validation.courses.level_required'),
-                'target_gender.required' => __('validation.courses.gender_required'),
-                'grade.required' => __('validation.courses.grade_required'),
-                'image.image' => __('validation.courses.image_type'),
-                'image.max' => __('validation.courses.image_size')
+                'title.required' => 'العنوان مطلوب|Title is required',
+                'title.unique' => 'العنوان موجود بالفعل|Title already exists',
+                'description.required' => 'الوصف مطلوب|Description is required',
+                'price.required' => 'السعر مطلوب|Price is required',
+                'price.numeric' => 'السعر يجب أن يكون رقم|Price must be numeric',
+                'level.required' => 'المستوى مطلوب|Level is required',
+                'level.in' => 'المستوى يجب أن يكون beginner أو intermediate أو advanced|Invalid level',
+                'grade.required' => 'الصف الدراسي مطلوب|Grade is required',
+                'grade.in' => 'الصف الدراسي يجب أن يكون الاول أو الثاني أو الثالث|Invalid grade',
+                'image.image' => 'الملف يجب أن يكون صورة|File must be an image',
+                'image.mimes' => 'الصورة يجب أن تكون jpeg أو png أو jpg|Image must be jpeg, png or jpg',
+                'image.max' => 'حجم الصورة يجب ألا يزيد عن 2 ميجابايت|Image size must not exceed 2MB'
             ]);
 
             if ($validator->fails()) {
@@ -159,39 +181,77 @@ class CourseController extends Basecontroller
             }
 
             $data = $request->except('image');
+            $data['language'] = $data['language'] ?? 'ar';
+            $data['instructor_name'] = $data['instructor_name'] ?? 'أكاديمية الوردة';
 
+            // معالجة الصورة
             if ($request->hasFile('image')) {
+                // إذا تم رفع صورة، احفظها
                 $image = $request->file('image');
+
+                // إنشاء مجلد courses إذا لم يكن موجود
+                if (!Storage::disk('public')->exists('courses')) {
+                    Storage::disk('public')->makeDirectory('courses');
+                }
+
                 $path = $image->store('courses', 'public');
-
-                // $imageService = new ImageOptimizer();
-                // $imageService->optimize(storage_path('app/public/' . $path));
-
                 $data['image'] = $path;
+
+                Log::info('Course image uploaded', ['path' => $path]);
             } else {
-                $imageGenerator = new CourseImageGenerator();
-                $data['image'] = $imageGenerator->generateCourseImage(
-                    $request->title,
-                    $request->price,
-                    $request->description,
-                    $request->grade
-                );
+                // إنشاء صورة تلقائية
+                try {
+                    $imageGenerator = new CourseImageGenerator();
+
+                    // نسخ القوالب إلى المجلد المناسب أولاً
+                    $imageGenerator->copyTemplatesToStorage();
+
+                    $generatedImagePath = $imageGenerator->generateCourseImage(
+                        $request->title,
+                        floatval($request->price),
+                        $request->description,
+                        $request->grade
+                    );
+
+                    $data['image'] = $generatedImagePath;
+
+                    Log::info('Course image generated automatically', ['path' => $generatedImagePath]);
+                } catch (\Exception $e) {
+                    Log::error('Failed to generate course image', [
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
+                    ]);
+
+                    // إذا فشل في إنشاء الصورة، اتركها null
+                    $data['image'] = null;
+                }
             }
 
-            $data['user_id'] = $request->user()->id;
             $course = Course::create($data);
 
-            Cache::tags('courses')->flush();
+            // مسح الكاش
+            Cache::forget('courses_' . md5(''));
+            Cache::tags(['courses'])->flush();
+
+            Log::info('Course created successfully', [
+                'course_id' => $course->id,
+                'title' => $course->title,
+                'image' => $course->image
+            ]);
 
             return $this->successResponse(
-                new CourseResource($course),
-                __('messages.courses.created'),
+                new CourseResource($course->fresh()),
+                [
+                    'ar' => 'تم إنشاء الكورس بنجاح',
+                    'en' => 'Course created successfully'
+                ],
                 201
             );
 
         } catch (\Exception $e) {
             Log::error('Course creation error', [
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'request' => $request->except('image')
             ]);
             return $this->serverErrorResponse();
@@ -203,8 +263,11 @@ class CourseController extends Basecontroller
         try {
             $course = Course::findOrFail($id);
 
-            if ($request->user()->cannot('update', $course)) {
-                return $this->errorResponse(__('messages.unauthorized'), 403);
+            if (!$request->user() || !$request->user()->isAdmin()) {
+                return $this->errorResponse([
+                    'ar' => 'غير مصرح لك بتعديل هذا الكورس',
+                    'en' => 'Unauthorized to update this course'
+                ], 403);
             }
 
             $validator = Validator::make($request->all(), [
@@ -214,14 +277,11 @@ class CourseController extends Basecontroller
                 'level' => 'sometimes|in:beginner,intermediate,advanced',
                 'duration_hours' => 'nullable|integer|min:0',
                 'requirements' => 'nullable|string',
+                'instructor_name' => 'sometimes|string|max:255',
+                'language' => 'sometimes|string|max:10',
                 'grade' => 'sometimes|in:الاول,الثاني,الثالث',
-                'image' => 'nullable|image|max:2048',
+                'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
                 'is_active' => 'sometimes|boolean',
-            ], [
-                'title.string' => __('validation.courses.title_string'),
-                'price.numeric' => __('validation.courses.price_numeric'),
-                'image.image' => __('validation.courses.image_type'),
-                'image.max' => __('validation.courses.image_size')
             ]);
 
             if ($validator->fails()) {
@@ -231,29 +291,34 @@ class CourseController extends Basecontroller
             $data = $request->except('image');
 
             if ($request->hasFile('image')) {
+                // حذف الصورة القديمة
                 if ($course->image && Storage::disk('public')->exists($course->image)) {
                     Storage::disk('public')->delete($course->image);
                 }
 
                 $image = $request->file('image');
                 $path = $image->store('courses', 'public');
-
-                // $imageService = new ImageOptimizer();
-                // $imageService->optimize(storage_path('app/public/' . $path));
-
                 $data['image'] = $path;
             }
 
             $course->update($data);
-            Cache::tags('courses')->flush();
+
+            // مسح الكاش
+            Cache::tags(['courses'])->flush();
 
             return $this->successResponse(
-                new CourseResource($course),
-                __('messages.courses.updated')
+                new CourseResource($course->fresh()),
+                [
+                    'ar' => 'تم تحديث الكورس بنجاح',
+                    'en' => 'Course updated successfully'
+                ]
             );
 
         } catch (ModelNotFoundException $e) {
-            return $this->errorResponse(__('messages.courses.not_found'), 404);
+            return $this->errorResponse([
+                'ar' => 'الكورس غير موجود',
+                'en' => 'Course not found'
+            ], 404);
         } catch (\Exception $e) {
             Log::error('Course update error', [
                 'course_id' => $id,
@@ -268,8 +333,11 @@ class CourseController extends Basecontroller
         try {
             $course = Course::findOrFail($id);
 
-            if (request()->user()->cannot('delete', $course)) {
-                return $this->errorResponse(__('messages.unauthorized'), 403);
+            if (!request()->user() || !request()->user()->isAdmin()) {
+                return $this->errorResponse([
+                    'ar' => 'غير مصرح لك بحذف هذا الكورس',
+                    'en' => 'Unauthorized to delete this course'
+                ], 403);
             }
 
             if ($course->image && Storage::disk('public')->exists($course->image)) {
@@ -277,15 +345,21 @@ class CourseController extends Basecontroller
             }
 
             $course->delete();
-            Cache::tags('courses')->flush();
+            Cache::tags(['courses'])->flush();
 
             return $this->successResponse(
                 null,
-                __('messages.courses.deleted')
+                [
+                    'ar' => 'تم حذف الكورس بنجاح',
+                    'en' => 'Course deleted successfully'
+                ]
             );
 
         } catch (ModelNotFoundException $e) {
-            return $this->errorResponse(__('messages.courses.not_found'), 404);
+            return $this->errorResponse([
+                'ar' => 'الكورس غير موجود',
+                'en' => 'Course not found'
+            ], 404);
         } catch (\Exception $e) {
             Log::error('Course deletion error', [
                 'course_id' => $id,

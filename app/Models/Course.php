@@ -23,12 +23,23 @@ class Course extends Model
         'grade',
     ];
 
+    protected $appends = ['image_url'];
+
     protected function casts(): array
     {
         return [
             'price' => 'decimal:2',
             'is_active' => 'boolean',
         ];
+    }
+
+    // Accessor للحصول على رابط الصورة الكامل
+    public function getImageUrlAttribute()
+    {
+        if ($this->image) {
+            return url('storage/' . $this->image);
+        }
+        return null;
     }
 
     public function lessons()
@@ -50,9 +61,10 @@ class Course extends Model
     {
         return $this->hasMany(Rating::class);
     }
+
     public function scopeActive($query)
     {
-    return $query->where('is_active', true);
+        return $query->where('is_active', true);
     }
 
     public function payments()

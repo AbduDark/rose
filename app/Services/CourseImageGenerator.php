@@ -2,10 +2,7 @@
 
 namespace App\Services;
 
-use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Gd\Driver;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\{Log, Storage};
 
 class CourseImageGenerator
 {
@@ -17,129 +14,183 @@ class CourseImageGenerator
         'template5.jpg'
     ];
 
-    private ImageManager $manager;
-    private bool $useImagick = false;
-
-    public function __construct()
-    {
-        // استخدم Imagick إذا كان متوفرًا
-        if (class_exists('Imagick')) {
-            $this->manager = new ImageManager(new \Intervention\Image\Drivers\Imagick\Driver());
-            $this->useImagick = true;
-        } else {
-            $this->manager = new ImageManager(new Driver());
-        }
-    }
-
-    private function createDefaultImage(string $title, float $price, string $description, string $grade): string
-    {
-        // إنشاء صورة افتراضية بسيطة
-        $image = $this->manager->create(800, 600)->fill('#f8f9fa');
-        $this->addTextToImage($image, $title, $price, $description, $grade);
-        $filename = 'courses/' . uniqid() . '.jpg';
-        $fullPath = storage_path('app/public/' . $filename);
-
-        if (!file_exists(dirname($fullPath))) {
-            mkdir(dirname($fullPath), 0755, true);
-        }
-
-        $image->save($fullPath);
-        return $filename;
-    }
+    private array $colors = [
+        ['#e74c3c', '#c0392b'], // أحمر
+        ['#3498db', '#2980b9'], // أزرق
+        ['#2ecc71', '#27ae60'], // أخضر
+        ['#f39c12', '#e67e22'], // برتقالي
+        ['#9b59b6', '#8e44ad'], // بنفسجي
+    ];
 
     public function generateCourseImage(string $title, float $price, string $description, string $grade): string
     {
-        // اختيار قالب عشوائي
-        $templateName = $this->templates[array_rand($this->templates)];
-        $templatePath = storage_path('app/templates/' . $templateName);
-
-        // التأكد من وجود القالب
-        if (!file_exists($templatePath)) {
-            return $this->createDefaultImage($title, $price, $description, $grade);
-        }
-
         try {
-            // قراءة القالب
-            $image = $this->manager->read($templatePath);
-
-            // إضافة النصوص
-            $this->addTextToImage($image, $title, $price, $description, $grade);
-
-            // حفظ الصورة
-            $filename = 'courses/' . uniqid() . '.jpg';
-            $fullPath = storage_path('app/public/' . $filename);
-
-            if (!file_exists(dirname($fullPath))) {
-                mkdir(dirname($fullPath), 0755, true);
+            // إنشاء مجلد courses إذا لم يكن موجود
+            $coursesPath = storage_path('app/public/courses');
+            if (!file_exists($coursesPath)) {
+                mkdir($coursesPath, 0755, true);
             }
 
-            $image->save($fullPath);
+            // إنشاء صورة بسيطة باستخدام GD
+            $image = $this->createSimpleImage($title, $price, $description, $grade);
 
-            return $filename;
+            if (!$image) {
+                Log::warning('Failed to create image with GD, trying fallback method');
+                return $this->createFallbackImage($title, $price, $grade);
+            }
+
+            // حفظ الصورة
+            $filename = 'courses/' . uniqid() . '_course.jpg';
+            $fullPath = storage_path('app/public/' . $filename);
+
+            if (imagejpeg($image, $fullPath, 85)) {
+                imagedestroy($image);
+                Log::info('Course image generated successfully', ['filename' => $filename]);
+                return $filename;
+            }
+
+            imagedestroy($image);
+            throw new \Exception('Failed to save image');
+
         } catch (\Exception $e) {
             Log::error('Error generating course image: ' . $e->getMessage());
-            return $this->createDefaultImage($title, $price, $description, $grade);
+            return $this->createFallbackImage($title, $price, $grade);
         }
     }
 
-    private function addTextToImage($image, string $title, float $price, string $description, string $grade): void
+    private function createSimpleImage(string $title, float $price, string $description, string $grade)
     {
-        $titleColor = '#2c3e50';
-        $priceColor = '#e74c3c';
-        $descColor  = '#7f8c8d';
-        $gradeColor = '#27ae60';
+        // إنشاء صورة بحجم 800x600
+        $image = imagecreatetruecolor(800, 600);
 
-        $template = $image->filename ?? '';
-        switch (basename($template)) {
-            case 'template1.jpg':
-                $titleXY = [400, 180]; $priceXY = [400, 240]; $gradeXY = [400, 300]; break;
-            case 'template2.jpg':
-                $titleXY = [200, 100]; $priceXY = [200, 160]; $gradeXY = [200, 220]; break;
-            case 'template3.jpg':
-                $titleXY = [600, 400]; $priceXY = [600, 460]; $gradeXY = [600, 520]; break;
-            case 'template4.jpg':
-                $titleXY = [100, 500]; $priceXY = [100, 560]; $gradeXY = [100, 620]; break;
-            case 'template5.jpg':
-                $titleXY = [700, 100]; $priceXY = [700, 160]; $gradeXY = [700, 220]; break;
-            default:
-                $titleXY = [400, 200]; $priceXY = [400, 260]; $gradeXY = [400, 320];
+        if (!$image) {
+            return false;
         }
 
-        $title     = $this->fixArabicText($title);
-        $gradeText = $this->fixArabicText('الصف ' . $grade);
+        // اختيار لون عشوائي
+        $colorScheme = $this->colors[array_rand($this->colors)];
+
+        // تحويل الألوان من hex إلى RGB
+        $bgColor = $this->hexToRgb($colorScheme[0]);
+        $accentColor = $this->hexToRgb($colorScheme[1]);
+
+        // إنشاء الألوان
+        $backgroundColor = imagecolorallocate($image, $bgColor[0], $bgColor[1], $bgColor[2]);
+        $accentBgColor = imagecolorallocate($image, $accentColor[0], $accentColor[1], $accentColor[2]);
+        $white = imagecolorallocate($image, 255, 255, 255);
+        $darkGray = imagecolorallocate($image, 51, 51, 51);
+
+        // تعبئة الخلفية
+        imagefill($image, 0, 0, $backgroundColor);
+
+        // رسم شكل زخرفي
+        imagefilledrectangle($image, 0, 0, 800, 150, $accentBgColor);
+        imagefilledrectangle($image, 0, 450, 800, 600, $accentBgColor);
+
+        // إضافة النصوص
+        $this->addTextToImage($image, $title, $price, $grade, $white, $darkGray);
+
+        return $image;
+    }
+
+    private function addTextToImage($image, string $title, float $price, string $grade, $whiteColor, $darkColor)
+    {
+        // تحديد مسار الخط - استخدام الخط المدمج إذا لم يوجد خط مخصص
+        $fontPath = base_path('public/fonts/NotoSansArabic-Bold.ttf');
+        $useCustomFont = file_exists($fontPath);
+
+        // عنوان الكورس
+        $titleText = $this->truncateText($title, 40);
+        if ($useCustomFont) {
+            imagettftext($image, 24, 0, 50, 100, $whiteColor, $fontPath, $titleText);
+        } else {
+            imagestring($image, 5, 50, 70, $titleText, $whiteColor);
+        }
+
+        // السعر
         $priceText = $price . ' جنيه';
+        if ($useCustomFont) {
+            imagettftext($image, 20, 0, 50, 300, $darkColor, $fontPath, $priceText);
+        } else {
+            imagestring($image, 4, 50, 280, $priceText, $darkColor);
+        }
 
-        $image->text($title, $titleXY[0], $titleXY[1], function ($font) use ($titleColor) {
-            $font->filename(base_path('public/fonts/NotoSansArabic-Bold.ttf'));
-            $font->size(32);
-            $font->color($titleColor);
-            $font->align('center');
-            $font->valign('middle');
-        });
+        // الصف الدراسي
+        $gradeText = 'الصف ' . $grade;
+        if ($useCustomFont) {
+            imagettftext($image, 18, 0, 50, 350, $darkColor, $fontPath, $gradeText);
+        } else {
+            imagestring($image, 3, 50, 330, $gradeText, $darkColor);
+        }
 
-        $image->text($priceText, $priceXY[0], $priceXY[1], function ($font) use ($priceColor) {
-            $font->filename(base_path('public/fonts/NotoSansArabic-Bold.ttf'));
-            $font->size(28);
-            $font->color($priceColor);
-            $font->align('center');
-            $font->valign('middle');
-        });
-
-        $image->text($gradeText, $gradeXY[0], $gradeXY[1], function ($font) use ($gradeColor) {
-            $font->filename(base_path('public/fonts/NotoSansArabic-Bold.ttf'));
-            $font->size(24);
-            $font->color($gradeColor);
-            $font->align('center');
-            $font->valign('middle');
-        });
+        // شعار الأكاديمية
+        $logoText = '🌹 أكاديمية الوردة';
+        if ($useCustomFont) {
+            imagettftext($image, 16, 0, 550, 550, $whiteColor, $fontPath, $logoText);
+        } else {
+            imagestring($image, 3, 550, 530, $logoText, $whiteColor);
+        }
     }
 
-    private function fixArabicText($text): string
+    private function createFallbackImage(string $title, float $price, string $grade): string
     {
-        if ($this->useImagick) {
-            return $text;
+        try {
+            // إنشاء صورة SVG بسيطة
+            $svgContent = $this->generateSVGImage($title, $price, $grade);
+
+            $filename = 'courses/' . uniqid() . '_fallback.svg';
+            $fullPath = storage_path('app/public/' . $filename);
+
+            if (file_put_contents($fullPath, $svgContent)) {
+                Log::info('Fallback SVG image created', ['filename' => $filename]);
+                return $filename;
+            }
+
+            throw new \Exception('Failed to save SVG');
+
+        } catch (\Exception $e) {
+            Log::error('Failed to create fallback image: ' . $e->getMessage());
+
+            // كملاذ أخير، إنشاء اسم ملف وهمي
+            $filename = 'courses/default_' . md5($title . $price) . '.jpg';
+
+            // إنشاء صورة افتراضية بسيطة
+            $defaultContent = base64_decode('data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
+            file_put_contents(storage_path('app/public/' . $filename), $defaultContent);
+
+            return $filename;
         }
-        return implode('', array_reverse(preg_split('//u', $text, 0, PREG_SPLIT_NO_EMPTY)));
+    }
+
+    private function generateSVGImage(string $title, float $price, string $grade): string
+    {
+        $colorScheme = $this->colors[array_rand($this->colors)];
+        $titleText = htmlspecialchars($this->truncateText($title, 30));
+        $priceText = htmlspecialchars($price . ' جنيه');
+        $gradeText = htmlspecialchars('الصف ' . $grade);
+
+        return <<<SVG
+<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
+    <rect width="800" height="600" fill="{$colorScheme[0]}"/>
+    <rect width="800" height="150" fill="{$colorScheme[1]}"/>
+    <rect y="450" width="800" height="150" fill="{$colorScheme[1]}"/>
+
+    <text x="50" y="100" font-family="Arial, sans-serif" font-size="24" fill="white" font-weight="bold">{$titleText}</text>
+    <text x="50" y="300" font-family="Arial, sans-serif" font-size="20" fill="#333">{$priceText}</text>
+    <text x="50" y="350" font-family="Arial, sans-serif" font-size="18" fill="#333">{$gradeText}</text>
+    <text x="550" y="550" font-family="Arial, sans-serif" font-size="16" fill="white">🌹 أكاديمية الوردة</text>
+</svg>
+SVG;
+    }
+
+    private function hexToRgb(string $hex): array
+    {
+        $hex = str_replace('#', '', $hex);
+        return [
+            hexdec(substr($hex, 0, 2)),
+            hexdec(substr($hex, 2, 2)),
+            hexdec(substr($hex, 4, 2))
+        ];
     }
 
     private function truncateText(string $text, int $length): string
@@ -150,17 +201,61 @@ class CourseImageGenerator
     public function copyTemplatesToStorage(): void
     {
         $templatesDir = storage_path('app/templates');
+
         if (!file_exists($templatesDir)) {
             mkdir($templatesDir, 0755, true);
+            Log::info('Created templates directory');
         }
 
+        // إنشاء قوالب وهمية إذا لم توجد
         for ($i = 1; $i <= 5; $i++) {
-            $source = public_path("templates/template{$i}.jpg");
-            $destination = $templatesDir . "/template{$i}.jpg";
-
-            if (file_exists($source) && !file_exists($destination)) {
-                copy($source, $destination);
+            $templatePath = $templatesDir . "/template{$i}.jpg";
+            if (!file_exists($templatePath)) {
+                $this->createDummyTemplate($templatePath, $i);
             }
+        }
+    }
+
+    private function createDummyTemplate(string $path, int $templateNumber): void
+    {
+        try {
+            $image = imagecreatetruecolor(800, 600);
+            $colorScheme = $this->colors[($templateNumber - 1) % count($this->colors)];
+
+            $bgColor = $this->hexToRgb($colorScheme[0]);
+            $accentColor = $this->hexToRgb($colorScheme[1]);
+
+            $backgroundColor = imagecolorallocate($image, $bgColor[0], $bgColor[1], $bgColor[2]);
+            $accentBgColor = imagecolorallocate($image, $accentColor[0], $accentColor[1], $accentColor[2]);
+
+            imagefill($image, 0, 0, $backgroundColor);
+
+            // إضافة بعض الأشكال الزخرفية
+            switch ($templateNumber) {
+                case 1:
+                    imagefilledrectangle($image, 0, 0, 800, 100, $accentBgColor);
+                    break;
+                case 2:
+                    imagefilledellipse($image, 400, 300, 600, 400, $accentBgColor);
+                    break;
+                case 3:
+                    imagefilledrectangle($image, 600, 0, 800, 600, $accentBgColor);
+                    break;
+                case 4:
+                    imagefilledrectangle($image, 0, 500, 800, 600, $accentBgColor);
+                    break;
+                case 5:
+                    imagefilledrectangle($image, 0, 0, 200, 600, $accentBgColor);
+                    break;
+            }
+
+            imagejpeg($image, $path, 85);
+            imagedestroy($image);
+
+            Log::info("Created dummy template: template{$templateNumber}.jpg");
+
+        } catch (\Exception $e) {
+            Log::error("Failed to create dummy template {$templateNumber}: " . $e->getMessage());
         }
     }
 }

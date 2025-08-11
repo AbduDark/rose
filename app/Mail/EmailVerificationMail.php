@@ -1,4 +1,6 @@
 <?php
+
+// app/Mail/EmailVerificationMail.php
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
@@ -18,8 +20,41 @@ class EmailVerificationMail extends Mailable
 
     public function build()
     {
-        return $this->subject('تفعيل حسابك في Rose Academy')
-            ->view('emails.verify_email')
-            ->with(['verificationUrl' => $this->verificationUrl]);
+        return $this->subject('تحقق من بريدك الإلكتروني - أكاديمية الوردة')
+                   ->view('emails.verification')
+                   ->with([
+                       'verificationUrl' => $this->verificationUrl
+                   ]);
+    }
+}
+
+// app/Mail/PasswordResetMail.php
+namespace App\Mail;
+
+use Illuminate\Bus\Queueable;
+use Illuminate\Mail\Mailable;
+use Illuminate\Queue\SerializesModels;
+
+class PasswordResetMail extends Mailable
+{
+    use Queueable, SerializesModels;
+
+    public $resetUrl;
+    public $user;
+
+    public function __construct($resetUrl, $user = null)
+    {
+        $this->resetUrl = $resetUrl;
+        $this->user = $user;
+    }
+
+    public function build()
+    {
+        return $this->subject('إعادة تعيين كلمة المرور - أكاديمية الوردة')
+                   ->view('emails.password-reset')
+                   ->with([
+                       'resetUrl' => $this->resetUrl,
+                       'user' => $this->user
+                   ]);
     }
 }
