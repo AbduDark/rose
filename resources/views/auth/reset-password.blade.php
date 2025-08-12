@@ -76,73 +76,69 @@
 
 <div class="container">
     <h2>إعادة تعيين كلمة المرور</h2>
-     {{-- عرض الأخطاء --}}
-    @if ($errors->any())
-        <div style="background-color: #ffe6e6; color: #c0392b; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
-            <ul style="margin: 0; padding-left: 20px;">
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </div>
-    @endif
 
-    {{-- عرض رسالة النجاح --}}
-    @if (session('success'))
-        <div style="background-color: #e8f8f5; color: #27ae60; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
-            {{ session('success') }}
-        </div>
-    @endif
+    {{-- مكان عرض الرسائل --}}
+    <div id="messageBox" style="display:none; padding: 10px; border-radius: 5px; margin-bottom: 15px;"></div>
 
-
-    <form id="resetForm" method="POST" action="{{ url('/api/auth/reset-password') }}">
+    <form id="resetForm">
         @csrf
         <input type="hidden" name="token" value="{{ request()->query('token') }}">
         <input type="hidden" name="email" value="{{ request()->query('email') }}">
 
         <label for="password">كلمة المرور الجديدة</label>
         <input type="password" id="password" name="password" required>
-        <div id="passwordError" class="error">كلمة المرور يجب أن تكون على الأقل 8 أحرف وتحتوي على رقم وحرف كبير.</div>
 
         <label for="password_confirmation">تأكيد كلمة المرور</label>
         <input type="password" id="password_confirmation" name="password_confirmation" required>
-        <div id="confirmError" class="error">كلمة المرور غير متطابقة.</div>
 
         <button type="submit">تغيير كلمة المرور</button>
     </form>
 </div>
 
 <script>
-document.getElementById('resetForm').addEventListener('submit', function(e) {
-    let valid = true;
+document.getElementById('resetForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
 
-    const password = document.getElementById('password').value.trim();
-    const confirm = document.getElementById('password_confirmation').value.trim();
-    const passwordError = document.getElementById('passwordError');
-    const confirmError = document.getElementById('confirmError');
+    let form = e.target;
+    let formData = new FormData(form);
+    let messageBox = document.getElementById('messageBox');
 
-    // تحقق من قوة كلمة المرور
-    const passwordRegex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
-    if (!passwordRegex.test(password)) {
-        passwordError.style.display = 'block';
-        valid = false;
-    } else {
-        passwordError.style.display = 'none';
-    }
+    try {
+        let response = await fetch("{{ url('/api/auth/reset-password') }}", {
+            method: "POST",
+            headers: {
+                "Accept": "application/json",
+                "X-CSRF-TOKEN": formData.get('_token')
+            },
+            body: formData
+        });
 
-    // تحقق من التطابق
-    if (password !== confirm) {
-        confirmError.style.display = 'block';
-        valid = false;
-    } else {
-        confirmError.style.display = 'none';
-    }
+        let result = await response.json();
+        messageBox.style.display = 'block';
 
-    if (!valid) {
-        e.preventDefault();
+        if (response.ok) {
+            messageBox.style.backgroundColor = '#e8f8f5';
+            messageBox.style.color = '#27ae60';
+            messageBox.innerText = result.message || 'تم تغيير كلمة المرور بنجاح';
+            form.reset();
+        } else {
+            messageBox.style.backgroundColor = '#ffe6e6';
+            messageBox.style.color = '#c0392b';
+
+            if (result.errors) {
+                messageBox.innerHTML = Object.values(result.errors).map(err => `<div>${err}</div>`).join('');
+            } else {
+                messageBox.innerText = result.message || 'حدث خطأ أثناء تغيير كلمة المرور';
+            }
+        }
+
+    } catch (error) {
+        messageBox.style.display = 'block';
+        messageBox.style.backgroundColor = '#ffe6e6';
+        messageBox.style.color = '#c0392b';
+        messageBox.innerText = 'فشل الاتصال بالخادم';
     }
 });
 </script>
-
 </body>
 </html>

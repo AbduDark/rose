@@ -716,16 +716,22 @@ class AuthController extends Controller
         }
 
         // إذا كان الطلب من صفحة HTML
-        return view('auth.reset-success');
+        return back()->with('success', 'تم تغيير كلمة المرور بنجاح');
+
 
     } catch (\Exception $e) {
         Log::error('Reset password error', [
             'error' => $e->getMessage(),
             'trace' => $e->getTraceAsString()
         ]);
-        return $request->expectsJson()
-            ? response()->json(['message' => 'خطأ في الخادم'], 500)
-            : back()->withErrors(['general' => 'حدث خطأ، حاول لاحقًا']);
+        // إذا كان الطلب من API
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'حدث خطأ أثناء تغيير كلمة المرور'], 500);
+        }
+
+        // إذا كان الطلب من صفحة HTML
+        return back()->withErrors(['password' => 'حدث خطأ أثناء تغيير كلمة المرور']);
+
     }
 }
 
