@@ -262,7 +262,6 @@ class CourseController extends BaseController
 
             // مسح الكاش
             Cache::forget('courses_' . md5(''));
-            Cache::tags(['courses'])->flush();
 
             Log::info('Course created successfully', [
                 'course_id' => $course->id,
@@ -335,7 +334,8 @@ class CourseController extends BaseController
             $course->update($data);
 
             // مسح الكاش
-            Cache::tags(['courses'])->flush();
+            Cache::forget('courses_' . md5(''));  // مسح كاش القائمة
+            Cache::forget('course_' . $id);       // مسح كاش الكورس المحدد
 
             return $this->successResponse(
                 new CourseResource($course->fresh()),
@@ -376,7 +376,8 @@ class CourseController extends BaseController
             }
 
             $course->delete();
-            Cache::tags(['courses'])->flush();
+            Cache::forget('courses_' . md5(''));  // مسح كاش القائمة
+            Cache::forget('course_' . $id);       // مسح كاش الكورس المحذوف
 
             return $this->successResponse(
                 null,
