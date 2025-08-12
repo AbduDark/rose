@@ -28,16 +28,16 @@ class CourseImageGenerator
         ['#9b59b6', '#8e44ad'], // بنفسجي
     ];
 
-    public function generateCourseImage(string $title, float $price, string $description, string $grade): string
+        public function generateCourseImage(string $title, float $price, string $description, string $grade): string
     {
         try {
-            // إنشاء مجلد courses إذا لم يكن موجود
-            $coursesPath = storage_path('app/public/courses');
+            // تغيير المسار إلى public/uploads/courses
+            $coursesPath = public_path('uploads/courses');
             if (!file_exists($coursesPath)) {
                 mkdir($coursesPath, 0755, true);
             }
 
-            // إنشاء صورة بسيطة باستخدام GD
+            // إنشاء الصورة
             $image = $this->createSimpleImage($title, $price, $description, $grade);
 
             if (!$image) {
@@ -45,14 +45,15 @@ class CourseImageGenerator
                 return $this->createFallbackImage($title, $price, $grade);
             }
 
-            // حفظ الصورة
-            $filename = 'courses/' . uniqid() . '_course.jpg';
-            $fullPath = storage_path('app/public/' . $filename);
+            // حفظ الصورة في المسار الجديد
+            $filename = uniqid() . '_course.jpg';
+            $relativePath = 'uploads/courses/' . $filename;
+            $fullPath = public_path($relativePath);
 
             if (imagejpeg($image, $fullPath, 85)) {
                 imagedestroy($image);
-                Log::info('Course image generated successfully', ['filename' => $filename]);
-                return $filename;
+                Log::info('Course image generated successfully', ['path' => $relativePath]);
+                return $relativePath; // إعادة المسار النسبي
             }
 
             imagedestroy($image);
@@ -63,6 +64,7 @@ class CourseImageGenerator
             return $this->createFallbackImage($title, $price, $grade);
         }
     }
+
 
     private function createSimpleImage(string $title, float $price, string $description, string $grade)
     {
@@ -138,18 +140,25 @@ class CourseImageGenerator
         }
     }
 
-    private function createFallbackImage(string $title, float $price, string $grade): string
+  private function createFallbackImage(string $title, float $price, string $grade): string
     {
         try {
-            // إنشاء صورة SVG بسيطة
+            // إنشاء مجلد إذا لم يكن موجود
+            $coursesPath = public_path('uploads/courses');
+            if (!file_exists($coursesPath)) {
+                mkdir($coursesPath, 0755, true);
+            }
+
+            // إنشاء SVG
             $svgContent = $this->generateSVGImage($title, $price, $grade);
 
-            $filename = 'courses/' . uniqid() . '_fallback.svg';
-            $fullPath = storage_path('app/public/' . $filename);
+            $filename = uniqid() . '_fallback.svg';
+            $relativePath = 'uploads/courses/' . $filename;
+            $fullPath = public_path($relativePath);
 
             if (file_put_contents($fullPath, $svgContent)) {
-                Log::info('Fallback SVG image created', ['filename' => $filename]);
-                return $filename;
+                Log::info('Fallback SVG image created', ['path' => $relativePath]);
+                return $relativePath;
             }
 
             throw new \Exception('Failed to save SVG');
@@ -157,14 +166,15 @@ class CourseImageGenerator
         } catch (\Exception $e) {
             Log::error('Failed to create fallback image: ' . $e->getMessage());
 
-            // كملاذ أخير، إنشاء اسم ملف وهمي
-            $filename = 'courses/default_' . md5($title . $price) . '.jpg';
+            // كملاذ أخير، إنشاء صورة افتراضية
+            $filename = 'default_' . md5($title . $price) . '.jpg';
+            $relativePath = 'uploads/courses/' . $filename;
+            $fullPath = public_path($relativePath);
 
-            // إنشاء صورة افتراضية بسيطة
             $defaultContent = base64_decode('data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
-            file_put_contents(storage_path('app/public/' . $filename), $defaultContent);
+            file_put_contents($fullPath, $defaultContent);
 
-            return $filename;
+            return $relativePath;
         }
     }
 

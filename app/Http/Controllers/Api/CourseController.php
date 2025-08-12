@@ -211,51 +211,30 @@ class CourseController extends BaseController
                 return $this->validationErrorResponse(new ValidationException($validator));
             }
 
-            $data = $request->except('image');
-            $data['language'] = $data['language'] ?? 'ar';
-            $data['instructor_name'] = $data['instructor_name'] ?? 'أكاديمية الوردة';
+             $data = $request->except('image');
+        $data['language'] = $data['language'] ?? 'ar';
+        $data['instructor_name'] = $data['instructor_name'] ?? 'أكاديمية روز';
 
-            // معالجة الصورة
-            if ($request->hasFile('image')) {
-                // إذا تم رفع صورة، احفظها
-                $image = $request->file('image');
-
-                // إنشاء مجلد courses إذا لم يكن موجود
-                if (!Storage::disk('public')->exists('courses')) {
-                    Storage::disk('public')->makeDirectory('courses');
-                }
-
-                $path = $image->store('courses', 'public');
-                $data['image'] = $path;
-
-                Log::info('Course image uploaded', ['path' => $path]);
-            } else {
-                // إنشاء صورة تلقائية
-                try {
-                    $imageGenerator = new CourseImageGenerator();
-
-                    // نسخ القوالب إلى المجلد المناسب أولاً
-                    $imageGenerator->copyTemplatesToStorage();
-
-                    $generatedImagePath = $imageGenerator->generateCourseImage(
-                        $request->title,
-                        floatval($request->price),
-                        $request->description,
-                        $request->grade
-                    );
-
-                    $data['image'] = $generatedImagePath;
-
-                    Log::info('Course image generated automatically', ['path' => $generatedImagePath]);
-                } catch (\Exception $e) {
-                    Log::error('Failed to generate course image', [
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString()
-                    ]);
-
-                    // إذا فشل في إنشاء الصورة، اتركها null
-                    $data['image'] = null;
-                }
+        // معالجة الصورة
+        if ($request->hasFile('image')) {
+            $image = $request->file('image');
+            $imageName = time() . '_' . $image->getClientOriginalName();
+            $image->move(public_path('uploads/courses'), $imageName);
+            $data['image'] = 'uploads/courses/' . $imageName;
+        } else {
+            // إنشاء صورة تلقائية باستخدام الخدمة المعدلة
+            try {
+                $imageGenerator = new CourseImageGenerator();
+                $generatedImagePath = $imageGenerator->generateCourseImage(
+                    $request->title,
+                    floatval($request->price),
+                    $request->description,
+                    $request->grade
+                );
+                $data['image'] = $generatedImagePath;
+            } catch (\Exception $e) {
+                $data['image'] = null;
+            }
             }
 
             $course = Course::create($data);
