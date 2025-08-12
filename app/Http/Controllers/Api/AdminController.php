@@ -75,7 +75,7 @@ class AdminController extends BaseController
                 }
             }
 
-            $users = $query->withCount(['subscriptions', 'favorites', 'payments'])
+            $users = $query->withCount(['subscriptions', 'favorites'])
                           ->orderBy('created_at', 'desc')
                           ->paginate($request->get('per_page', 15));
 
@@ -93,8 +93,8 @@ class AdminController extends BaseController
     public function getUserDetails($id)
     {
         try {
-            $user = User::with(['subscriptions.course', 'favorites.course', 'payments.course'])
-                       ->withCount(['subscriptions', 'favorites', 'payments'])
+            $user = User::with(['subscriptions.course', 'favorites.course'])
+                       ->withCount(['subscriptions', 'favorites'])
                        ->findOrFail($id);
 
             return $this->successResponse($user, [
