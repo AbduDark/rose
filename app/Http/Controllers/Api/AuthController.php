@@ -382,7 +382,7 @@ class AuthController extends Controller
                     'required',
                     'string',
                     'min:8',
-                    'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/',
+                    'regex:/^(?=.*[a-zA-Z])(?=.*\d)[a-zA-Z\d]+$/',
                     'confirmed'
                 ]
             ]);
@@ -666,13 +666,12 @@ class AuthController extends Controller
                 'required',
                 'string',
                 'min:8',               // على الأقل 8 أحرف
-                'regex:/[A-Z]/',       // حرف كبير
-                'regex:/[0-9]/',       // رقم
+                'regex:/^(?=.*[a-zA-Z])(?=.*\d)[a-zA-Z\d]+$/',         // يجب أن تحتوي على حرف كبير ورقم
                 'confirmed'            // تأكيد كلمة المرور
             ]
         ], [
             'email.exists' => 'البريد الإلكتروني غير موجود',
-            'password.regex' => 'كلمة المرور يجب أن تحتوي على حرف كبير ورقم'
+            'password.regex' => 'كلمة المرور يجب أن تحتوي على حرف علي الاقل و8 ارقام '
         ]);
 
         if ($validator->fails()) {
