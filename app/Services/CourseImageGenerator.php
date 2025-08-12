@@ -29,41 +29,36 @@ class CourseImageGenerator
     ];
 
         public function generateCourseImage(string $title, float $price, string $description, string $grade): string
-    {
-        try {
-            // تغيير المسار إلى public/uploads/courses
-            $coursesPath = public_path('uploads/courses');
-            if (!file_exists($coursesPath)) {
-                mkdir($coursesPath, 0755, true);
-            }
+{
+    try {
+        $coursesPath = public_path('uploads/courses');
+        if (!file_exists($coursesPath)) {
+            mkdir($coursesPath, 0755, true);
+        }
 
-            // إنشاء الصورة
-            $image = $this->createSimpleImage($title, $price, $description, $grade);
+        $image = $this->createSimpleImage($title, $price, $description, $grade);
 
-            if (!$image) {
-                Log::warning('Failed to create image with GD, trying fallback method');
-                return $this->createFallbackImage($title, $price, $grade);
-            }
-
-            // حفظ الصورة في المسار الجديد
-            $filename = uniqid() . '_course.jpg';
-            $relativePath = 'uploads/courses/' . $filename;
-            $fullPath = public_path($relativePath);
-
-            if (imagejpeg($image, $fullPath, 85)) {
-                imagedestroy($image);
-                Log::info('Course image generated successfully', ['path' => $relativePath]);
-                return $relativePath; // إعادة المسار النسبي
-            }
-
-            imagedestroy($image);
-            throw new \Exception('Failed to save image');
-
-        } catch (\Exception $e) {
-            Log::error('Error generating course image: ' . $e->getMessage());
+        if (!$image) {
+            Log::warning('Failed to create image with GD, trying fallback method');
             return $this->createFallbackImage($title, $price, $grade);
         }
+
+        $filename = uniqid() . '_course.jpg';
+        $relativePath = 'uploads/courses/' . $filename; // بدون 'public/'
+        $fullPath = public_path($relativePath);
+
+        if (imagejpeg($image, $fullPath, 85)) {
+            imagedestroy($image);
+            return $relativePath; // إرجاع المسار النسبي فقط
+        }
+
+        imagedestroy($image);
+        throw new \Exception('Failed to save image');
+    } catch (\Exception $e) {
+        return $this->createFallbackImage($title, $price, $grade);
     }
+}
+
 
 
     private function createSimpleImage(string $title, float $price, string $description, string $grade)

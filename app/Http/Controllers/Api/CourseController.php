@@ -211,52 +211,41 @@ class CourseController extends BaseController
                 return $this->validationErrorResponse(new ValidationException($validator));
             }
 
-             $data = $request->except('image');
+     $data = $request->except('image');
         $data['language'] = $data['language'] ?? 'ar';
         $data['instructor_name'] = $data['instructor_name'] ?? 'أكاديمية روز';
 
-        // معالجة الصورة
         if ($request->hasFile('image')) {
             $image = $request->file('image');
-            $imageName = time() . '_' . $image->getClientOriginalName();
-            $image->move(public_path('uploads/courses'), $imageName);
-            $data['image'] = 'uploads/courses/' . $imageName;
+            $filename = time() . '_' . $image->getClientOriginalName();
+            $relativePath = 'uploads/courses/' . $filename;
+            $image->move(public_path('uploads/courses'), $filename);
+            $data['image'] = $relativePath;
         } else {
-            // إنشاء صورة تلقائية باستخدام الخدمة المعدلة
-            try {
-                $imageGenerator = new CourseImageGenerator();
-                $generatedImagePath = $imageGenerator->generateCourseImage(
-                    $request->title,
-                    floatval($request->price),
-                    $request->description,
-                    $request->grade
-                );
-                $data['image'] = $generatedImagePath;
-            } catch (\Exception $e) {
-                $data['image'] = null;
-            }
-            }
-
-            $course = Course::create($data);
-
-            // مسح الكاش
-            Cache::forget('courses_' . md5(''));
-
-            Log::info('Course created successfully', [
-                'course_id' => $course->id,
-                'title' => $course->title,
-                'image' => $course->image
-            ]);
-
-            return $this->successResponse(
-                new CourseResource($course->fresh()),
-                [
-                    'ar' => 'تم إنشاء الكورس بنجاح',
-                    'en' => 'Course created successfully'
-                ],
-                201
+            $imageGenerator = new CourseImageGenerator();
+            $generatedImagePath = $imageGenerator->generateCourseImage(
+                $request->title,
+                floatval($request->price),
+                $request->description,
+                $request->grade
             );
+            $data['image'] = $generatedImagePath;
+        }
 
+        $course = Course::create($data);
+        Cache::forget('courses_' . md5(''));
+
+        // إنشاء URL كامل للصورة
+        $course->image_url = url($course->image);
+
+        return $this->successResponse(
+            new CourseResource($course),
+            [
+                'ar' => 'تم إنشاء الكورس بنجاح',
+                'en' => 'Course created successfully'
+            ],
+            201
+        );
         } catch (\Exception $e) {
             Log::error('Course creation error', [
                 'error' => $e->getMessage(),
