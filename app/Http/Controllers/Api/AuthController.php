@@ -269,7 +269,17 @@ class AuthController extends Controller
 
     public function profile(Request $request)
     {
-        return response()->json($request->user());
+          $user = $request->user();
+          if (!$user) {
+            return $this->errorResponse([
+                'ar' => 'يجب تسجيل الدخول أولاً',
+                'en' => 'You must be logged in to perform this action'
+            ], 401);
+        }else{
+            return response()->json($request->user());
+        }
+
+        
     }
 
    public function logout(Request $request)
