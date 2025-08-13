@@ -20,7 +20,7 @@ class NotificationService
             'user_id' => $userId,
             'course_id' => $courseId,
             'sender_id' => $senderId,
-            'data' => $data
+            'data' => $data ? json_encode($data) : null
         ]);
     }
 
@@ -91,7 +91,7 @@ class NotificationService
      */
     public static function subscriptionApproved($userId, $courseId)
     {
-        $course = Course::find($courseId);
+        $course = Course::findOrFail($courseId);
 
         return self::sendToUser(
             $userId,
@@ -109,7 +109,7 @@ class NotificationService
      */
     public static function subscriptionRejected($userId, $courseId, $reason = null)
     {
-        $course = Course::find($courseId);
+        $course = Course::findOrFail($courseId);
         $message = "تم رفض اشتراكك في كورس: {$course->title}.";
 
         if ($reason) {
@@ -132,7 +132,7 @@ class NotificationService
      */
     public static function subscriptionExpired($userId, $courseId)
     {
-        $course = Course::find($courseId);
+        $course = Course::findOrFail($courseId);
 
         return self::sendToUser(
             $userId,
@@ -150,7 +150,7 @@ class NotificationService
      */
     public static function newLessonAdded($courseId, $lessonTitle)
     {
-        $course = Course::find($courseId);
+        $course = Course::findOrFail($courseId);
 
         return self::sendToCourseStudents(
             $courseId,
@@ -167,20 +167,7 @@ class NotificationService
      */
     public static function subscriptionExpiringReminder($userId, $courseId, $daysRemaining)
     {
-        $course = Course::find($courseId);
-
-        return self::sendToUser(
-            $userId,
-            'تذكير: اشتراكك ينتهي قريباً',
-            "سينتهي اشتراكك في كورس '{$course->title}' خلال {$daysRemaining} يوم. يرجى تجديد الاشتراك للاستمرار في الوصول للكورس.",
-            'subscription',
-            $courseId,
-            null,
-            ['action' => 'subscription_expiring', 'course_id' => $courseId, 'days_remaining' => $daysRemaining]
-        );
-    }courseId, $daysRemaining)
-    {
-        $course = Course::find($courseId);
+        $course = Course::findOrFail($courseId);
 
         return self::sendToUser(
             $userId,
