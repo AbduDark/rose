@@ -134,7 +134,7 @@ class LargeCourseSeeder extends Seeder
         }
 
         // إنشاء دفعات مالية
-       
+
 
         // إنشاء تقييمات عشوائية
         foreach ($users as $user) {
@@ -191,11 +191,13 @@ class LargeCourseSeeder extends Seeder
                 ];
 
                 Comment::create([
-                    'user_id' => $user->id,
-                    'lesson_id' => $lesson->id,
-                    'content' => $comments[array_rand($comments)],
-                    'is_approved' => rand(0, 1) ? true : false
-                ]);
+    'user_id' => $user->id,
+    'lesson_id' => $lesson->id,
+    'course_id' => $lesson->course_id, // حل المشكلة
+    'content' => $comments[array_rand($comments)],
+    'is_approved' => rand(0, 1) ? true : false
+]);
+
             }
         }
 
