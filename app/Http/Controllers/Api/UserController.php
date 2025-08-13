@@ -60,6 +60,38 @@ class UserController extends Controller
         ]);
     }
 
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+
+        $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'email' => 'sometimes|email|unique:users,email,' . $user->id,
+            'phone' => 'sometimes|string|max:20',
+            'gender' => 'sometimes|in:male,female',
+            'password' => 'sometimes|min:8|confirmed',
+        ]);
+
+        $data = $request->only(['name', 'email', 'phone', 'gender']);
+
+        if ($request->filled('password')) {
+            $data['password'] = Hash::make($request->password);
+            // Force logout user if password changed
+            $user->tokens()->delete();
+            $user->update([
+                'active_session_id' => null,
+                'device_fingerprint' => null,
+            ]);
+        }
+
+        $user->update($data);
+
+        return response()->json([
+            'message' => 'Profile updated successfully',
+            'user' => $user->fresh()
+        ]);
+    }
+
     public function destroy($id)
     {
         $user = User::findOrFail($id);

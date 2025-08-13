@@ -50,10 +50,10 @@ Route::get('courses/{id}/ratings', [RatingController::class, 'index']);
 Route::middleware(['auth:sanctum'])->group(function () {
     // Authentication
     Route::prefix('auth')->group(function () {
-        Route::get('profile',     [AuthController::class, 'profile']);
-        Route::post('logout',     [AuthController::class, 'logout']);
-        Route::put('update',      [AuthController::class, 'updateProfile']);
-        Route::put('password',    [AuthController::class, 'changePassword']);
+        Route::get('/profile', [AuthController::class, 'profile']);
+        Route::post('/logout', [AuthController::class, 'logout']);
+        Route::put('/profile', [UserController::class, 'updateProfile']);
+        Route::post('/refresh', [AuthController::class, 'refresh']);
     });
 
     // Subscription routes
