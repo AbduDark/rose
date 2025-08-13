@@ -204,11 +204,9 @@ trait Queueable
      */
     public function chain($chain)
     {
-        $jobs = ChainedBatch::prepareNestedBatches(new Collection($chain));
-
-        $this->chained = $jobs->map(function ($job) {
-            return $this->serializeJob($job);
-        })->all();
+        $this->chained = ChainedBatch::prepareNestedBatches(new Collection($chain))
+            ->map(fn ($job) => $this->serializeJob($job))
+            ->all();
 
         return $this;
     }
@@ -221,9 +219,11 @@ trait Queueable
      */
     public function prependToChain($job)
     {
-        $jobs = ChainedBatch::prepareNestedBatches(new Collection([$job]));
+        $jobs = ChainedBatch::prepareNestedBatches(Collection::wrap($job));
 
-        $this->chained = Arr::prepend($this->chained, $this->serializeJob($jobs->first()));
+        foreach ($jobs->reverse() as $job) {
+            $this->chained = Arr::prepend($this->chained, $this->serializeJob($job));
+        }
 
         return $this;
     }
@@ -236,9 +236,11 @@ trait Queueable
      */
     public function appendToChain($job)
     {
-        $jobs = ChainedBatch::prepareNestedBatches(new Collection([$job]));
+        $jobs = ChainedBatch::prepareNestedBatches(Collection::wrap($job));
 
-        $this->chained = array_merge($this->chained, [$this->serializeJob($jobs->first())]);
+        foreach ($jobs as $job) {
+            $this->chained = array_merge($this->chained, [$this->serializeJob($job)]);
+        }
 
         return $this;
     }

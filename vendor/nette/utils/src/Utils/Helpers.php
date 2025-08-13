@@ -10,8 +10,6 @@ declare(strict_types=1);
 namespace Nette\Utils;
 
 use Nette;
-use function array_unique, ini_get, levenshtein, max, min, ob_end_clean, ob_get_clean, ob_start, preg_replace, strlen;
-use const PHP_OS_FAMILY;
 
 
 class Helpers
@@ -24,7 +22,7 @@ class Helpers
 	 */
 	public static function capture(callable $func): string
 	{
-		ob_start(fn() => '');
+		ob_start(function () {});
 		try {
 			$func();
 			return ob_get_clean();

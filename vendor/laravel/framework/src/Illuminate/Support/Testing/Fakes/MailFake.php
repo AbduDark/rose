@@ -51,11 +51,11 @@ class MailFake implements Factory, Fake, Mailer, MailQueue
      * Create a new mail fake.
      *
      * @param  MailManager  $manager
-     * @return void
      */
     public function __construct(MailManager $manager)
     {
         $this->manager = $manager;
+        $this->currentMailer = $manager->getDefaultDriver();
     }
 
     /**

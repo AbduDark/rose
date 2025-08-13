@@ -11,8 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
+
 
 class SubscriptionController extends Controller
 {
@@ -340,78 +339,6 @@ class SubscriptionController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            return $this->serverErrorResponse();
-        }
-    }
-
-    public function getAllSubscriptions(Request $request)
-    {
-        try {
-            // Check if user is admin
-            if (!$request->user() || !$request->user()->isAdmin()) {
-                return $this->errorResponse([
-                    'ar' => 'غير مصرح لك بالوصول لهذه البيانات',
-                    'en' => 'Unauthorized to access this data'
-                ], 403);
-            }
-
-            $query = Subscription::with(['user:id,name,email', 'course:id,title']);
-
-            // Add filters
-            if ($request->has('status')) {
-                $query->where('status', $request->status);
-            }
-
-            if ($request->has('course_id')) {
-                $query->where('course_id', $request->course_id);
-            }
-
-            if ($request->has('user_id')) {
-                $query->where('user_id', $request->user_id);
-            }
-
-            if ($request->has('search')) {
-                $search = $request->search;
-                $query->whereHas('user', function($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('email', 'like', "%{$search}%");
-                })->orWhereHas('course', function($q) use ($search) {
-                    $q->where('title', 'like', "%{$search}%");
-                });
-            }
-
-            $subscriptions = $query->orderBy('created_at', 'desc')
-                                 ->paginate($request->get('per_page', 15));
-
-            // Add calculated fields
-            $subscriptions->getCollection()->transform(function ($subscription) {
-                $subscription->is_active = $subscription->is_active;
-                $subscription->is_expired = $subscription->isExpired();
-                $subscription->days_remaining = $subscription->getDaysRemaining();
-                $subscription->hours_remaining = $subscription->getHoursRemaining();
-                $subscription->is_expiring_soon = $subscription->isExpiringSoon();
-                return $subscription;
-            });
-
-            return $this->successResponse([
-                'subscriptions' => $subscriptions->items(),
-                'pagination' => [
-                    'current_page' => $subscriptions->currentPage(),
-                    'last_page' => $subscriptions->lastPage(),
-                    'per_page' => $subscriptions->perPage(),
-                    'total' => $subscriptions->total(),
-                    'from' => $subscriptions->firstItem(),
-                    'to' => $subscriptions->lastItem()
-                ]
-            ], [
-                'ar' => 'تم جلب الاشتراكات بنجاح',
-                'en' => 'Subscriptions retrieved successfully'
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Get all subscriptions error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
             return $this->serverErrorResponse();
         }
     }

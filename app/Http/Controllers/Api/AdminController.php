@@ -1,7 +1,10 @@
 <?php
 
 namespace App\Http\Controllers\Api;
-use Illuminate\Routing\Controller as BaseController;
+
+use Illuminate\Routing\Controller;
+
+use Illuminate\Routing\Controller as BaseController; // Add this line
 use App\Traits\ApiResponseTrait;
 use App\Models\User;
 use App\Models\Course;
