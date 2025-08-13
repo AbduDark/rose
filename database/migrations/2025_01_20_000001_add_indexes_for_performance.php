@@ -1,4 +1,3 @@
-
 <?php
 
 use Illuminate\Database\Migrations\Migration;
@@ -15,12 +14,18 @@ return new class extends Migration
             $table->index(['status', 'is_active']);
         });
 
+        // إضافة فهارس لجدول الدورات
         Schema::table('courses', function (Blueprint $table) {
-            $table->index(['gender', 'grade']);
+            $table->index(['grade']);
+            $table->index(['is_active']);
+            $table->index(['created_at']);
         });
 
+        // إضافة فهارس لجدول الدروس
         Schema::table('lessons', function (Blueprint $table) {
-            $table->index('course_id');
+            $table->index(['course_id']);
+            $table->index(['course_id', 'order']);
+            $table->index(['is_active']);
         });
 
         Schema::table('comments', function (Blueprint $table) {
@@ -37,11 +42,15 @@ return new class extends Migration
         });
 
         Schema::table('courses', function (Blueprint $table) {
-            $table->dropIndex(['gender', 'grade']);
+            $table->dropIndex(['grade']);
+            $table->dropIndex(['is_active']);
+            $table->dropIndex(['created_at']);
         });
 
         Schema::table('lessons', function (Blueprint $table) {
             $table->dropIndex(['course_id']);
+            $table->dropIndex(['course_id', 'order']);
+            $table->dropIndex(['is_active']);
         });
 
         Schema::table('comments', function (Blueprint $table) {
