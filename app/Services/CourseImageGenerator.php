@@ -1,4 +1,3 @@
-
 <?php
 
 namespace App\Services;
@@ -374,9 +373,9 @@ class CourseImageGenerator
                 $current = $try;
             } else {
                 if ($current !== '') $lines[] = $current;
-                
+
                 $wwidth = $this->getTextWidth($word, $fontFile, $fontSize);
-                
+
                 if ($wwidth <= $maxWidth) {
                     $current = $word;
                 } else {
@@ -420,7 +419,7 @@ class CourseImageGenerator
         // تنظيف النص وإزالة المسافات الزائدة
         $text = trim($text);
         $text = preg_replace('/\s+/', ' ', $text);
-        
+
         // إعادة النص كما هو - الخط العربي سيتولى التشكيل الصحيح
         return $text;
     }
