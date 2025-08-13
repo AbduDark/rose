@@ -422,7 +422,7 @@ class AuthController extends Controller
         }
     }
 
-    public function updateProfile(Request $request)
+ public function updateProfile(Request $request)
 {
     try {
         $user = $request->user();
@@ -434,13 +434,6 @@ class AuthController extends Controller
             ], 404);
         }
 
-        // Log: بداية العملية
-        Log::info('--- Start updateProfile ---', [
-            'user_id' => $user->id,
-            'request_data' => $request->all(),
-            'has_file_image' => $request->hasFile('image')
-        ]);
-
         $validator = Validator::make($request->all(), [
             'name'  => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:20|unique:users,phone,' . $user->id,
@@ -448,75 +441,64 @@ class AuthController extends Controller
         ]);
 
         if ($validator->fails()) {
-            Log::warning('Validation failed', $validator->errors()->toArray());
             return $this->validationErrorResponse(new ValidationException($validator));
         }
 
+        // Prepare update data
         $updateData = array_filter([
             'name'  => $request->name,
             'phone' => $request->phone,
-        ], function ($value) {
-            return !is_null($value);
-        });
-
-        // Log: البيانات قبل الصورة
-        Log::info('Update data before image', $updateData);
+        ]);
 
         // Handle image upload
-        if ($request->hasFile('image')) {
-            $image = $request->file('image');
 
-            // حذف الصورة القديمة
-            if ($user->image && file_exists(public_path($user->image))) {
-                @unlink(public_path($user->image));
-            }
+       if ($request->hasFile('image')) {
+        $image = $request->file('image');
 
-            // رفع الصورة الجديدة
-            $imageName = uniqid('avatar_') . '.' . $image->getClientOriginalExtension();
-            $uploadPath = public_path('uploads/avatars');
-
-            if (!file_exists($uploadPath)) {
-                mkdir($uploadPath, 0755, true);
-            }
-
-            $image->move($uploadPath, $imageName);
-            $updateData['image'] = 'uploads/avatars/' . $imageName;
-
-            Log::info('Image uploaded', [
-                'path' => $updateData['image']
-            ]);
+        // حذف الصورة القديمة إذا كانت موجودة
+        if ($user->image && file_exists(public_path($user->image))) {
+            @unlink(public_path($user->image));
         }
 
-        // Log: البيانات النهائية
-        Log::info('Final update data', $updateData);
+        // اسم الملف الجديد
+        $imageName = uniqid('avatar_') . '.' . $image->getClientOriginalExtension();
+        $uploadPath = public_path('uploads/avatars');
 
-        // تحديث البيانات
-        $user->update($updateData);
+        // إنشاء المجلد إذا لم يكن موجود
+        if (!file_exists($uploadPath)) {
+            mkdir($uploadPath, 0755, true);
+        }
 
-        // Log: البيانات بعد التحديث
-        Log::info('User after update', $user->fresh()->toArray());
+        // نقل الصورة
+            $image->move($uploadPath, $imageName);
+            $updateData['image'] = 'uploads/avatars/' . $imageName;
+        }
+
+        // Only update if there's data to update
+        if (!empty($updateData)) {
+            $user->update($updateData);
+        }
+
+        // تجهيز بيانات الاستجابة مع رابط الصورة
+        $userData = $user->only(['id', 'name', 'email', 'phone', 'gender', 'role']);
+        if ($user->image) {
+            $userData['image'] = $user->image;
+            $userData['image_url'] = url($user->image);
+        }
 
         return $this->successResponse([
-            'user' => $user->fresh()
+            'user' => $userData,
+            'updated_fields' => array_keys($updateData)
         ], [
             'ar' => 'تم تحديث الملف الشخصي بنجاح',
             'en' => 'Profile updated successfully'
         ]);
 
     } catch (\Exception $e) {
-        Log::error('Profile update error', [
-            'user_id' => $request->user()?->id,
-            'error'   => $e->getMessage(),
-            'trace'   => $e->getTraceAsString(),
-            'request' => collect($request->except(['password', 'token']))
-        ]);
-
+        Log::error('Profile update error: ' . $e->getMessage());
         return $this->serverErrorResponse();
     }
 }
-
-
-
 
 
 
