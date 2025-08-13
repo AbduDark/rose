@@ -4,7 +4,8 @@ namespace App\Console\Commands;
 
 use App\Models\Subscription;
 use Illuminate\Console\Command;
-use App\Services\NotificationService; // افتراض أن لديك خدمة إشعارات
+use App\Services\NotificationService;
+use Illuminate\Support\Facades\Log;
 
 class DeactivateExpiredSubscriptions extends Command
 {
@@ -14,70 +15,48 @@ class DeactivateExpiredSubscriptions extends Command
     public function handle()
     {
         $this->info('بدء عملية تعطيل الاشتراكات المنتهية الصلاحية وإرسال الإشعارات...');
+        Log::info('Starting deactivation of expired subscriptions');
 
-        // الحصول على الاشتراكات المنتهية الصلاحية قبل تعطيلها
-        $expiredSubscriptions = Subscription::where('is_active', true)
+        // الحصول على الاشتراكات المنتهية الصلاحية
+        $expiredSubscriptions = Subscription::with(['user', 'course'])
+            ->where('is_active', true)
             ->where('status', 'approved')
             ->where('expires_at', '<', now())
             ->get();
 
         $this->info("تم العثور على {$expiredSubscriptions->count()} اشتراك منتهي الصلاحية");
+        Log::info("Found {$expiredSubscriptions->count()} expired subscriptions");
 
-        // إرسال إشعارات للمستخدمين
-        foreach ($expiredSubscriptions as $subscription) {
-            // افتراض أن NotificationService لديه دالة subscriptionExpired
-            // هذه الدالة يجب أن تكون مسؤولة عن إرسال الإشعار للمستخدم المحدد
-            NotificationService::subscriptionExpired($subscription->user_id, $subscription->course_id);
-            $this->line("تم إرسال إشعار للمستخدم {$subscription->user->name} بانتهاء اشتراكه في كورس {$subscription->course->title}");
-        }
-
-        // تعطيل الاشتراكات
+        // معالجة كل اشتراك
         $deactivatedCount = 0;
         foreach ($expiredSubscriptions as $subscription) {
-            $subscription->update(['is_active' => false]);
-            $deactivatedCount++;
+            try {
+                // إرسال إشعار للمستخدم
+                NotificationService::subscriptionExpired(
+                    $subscription->user_id,
+                    $subscription->course_id
+                );
+
+                $this->line("تم إرسال إشعار للمستخدم {$subscription->user->name} بانتهاء اشتراكه في كورس {$subscription->course->title}");
+
+                // تعطيل الاشتراك
+                $subscription->update(['is_active' => false]);
+                $deactivatedCount++;
+
+                Log::info("Deactivated subscription and sent notification", [
+                    'subscription_id' => $subscription->id,
+                    'user_id' => $subscription->user_id,
+                    'course_id' => $subscription->course_id,
+                    'expired_at' => $subscription->expires_at
+                ]);
+            } catch (\Exception $e) {
+                Log::error("Failed to process subscription {$subscription->id}: " . $e->getMessage());
+                $this->error("خطأ في معالجة الاشتراك {$subscription->id}: " . $e->getMessage());
+            }
         }
 
         $this->info("تم تعطيل {$deactivatedCount} اشتراك منتهي الصلاحية بنجاح.");
-
-        return 0;
-    }
-}
-<?php
-
-namespace App\Console\Commands;
-
-use Illuminate\Console\Command;
-use App\Models\Subscription;
-use Illuminate\Support\Facades\Log;
-
-class DeactivateExpiredSubscriptions extends Command
-{
-    protected $signature = 'subscriptions:deactivate-expired';
-    protected $description = 'Deactivate expired subscriptions';
-
-    public function handle()
-    {
-        $expiredSubscriptions = Subscription::where('status', 'approved')
-            ->where('expires_at', '<', now())
-            ->where('is_active', true)
-            ->get();
-
-        $count = 0;
-        foreach ($expiredSubscriptions as $subscription) {
-            $subscription->update(['is_active' => false]);
-            $count++;
-            
-            Log::info("Deactivated expired subscription", [
-                'subscription_id' => $subscription->id,
-                'user_id' => $subscription->user_id,
-                'course_id' => $subscription->course_id,
-                'expired_at' => $subscription->expires_at
-            ]);
-        }
-
-        $this->info("Deactivated {$count} expired subscriptions.");
-        Log::info("Deactivated {$count} expired subscriptions via command.");
+        Log::info("Successfully deactivated {$deactivatedCount} subscriptions");
 
         return 0;
     }

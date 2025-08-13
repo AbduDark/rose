@@ -1,4 +1,3 @@
-
 <?php
 
 namespace App\Http\Middleware;
@@ -7,7 +6,6 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Traits\ApiResponseTrait;
-
 class CheckSubscriptionExpiry
 {
     use ApiResponseTrait;
@@ -15,7 +13,7 @@ class CheckSubscriptionExpiry
     public function handle(Request $request, Closure $next)
     {
         $user = Auth::user();
-        
+
         if (!$user) {
             return $next($request);
         }
@@ -66,7 +64,7 @@ class CheckSubscriptionExpiry
                 'ar' => 'تنتهي صلاحية اشتراكك قريباً. يرجى التجديد قبل انتهاء الصلاحية',
                 'en' => 'Your subscription expires soon. Please renew before expiry'
             ]);
-            
+
             $request->attributes->set('expiring_subscriptions', $expiringSoon->map(function($sub) {
                 return [
                     'id' => $sub->id,
