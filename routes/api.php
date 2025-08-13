@@ -47,7 +47,7 @@ Route::get('courses/{id}',  [CourseController::class, 'show']);
 Route::get('courses/{id}/ratings', [RatingController::class, 'index']);
 
 // Authenticated User Routes
-Route::middleware(['auth:sanctum', 'check.subscription.expiry'])->group(function () {
+Route::middleware(['auth:sanctum', 'subscription.expiry'])->group(function () {
     // Authentication
     Route::prefix('auth')->group(function () {
         Route::get('/profile', [AuthController::class, 'profile']);

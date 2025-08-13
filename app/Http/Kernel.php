@@ -1,3 +1,4 @@
+
 <?php
 
 namespace App\Http;
@@ -42,13 +43,16 @@ class Kernel extends HttpKernel
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
             \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            \App\Http\Middleware\LocalizationMiddleware::class,
+            \App\Http\Middleware\SecurityLogMiddleware::class,
+            \App\Http\Middleware\ApiErrorHandler::class,
         ],
     ];
 
     /**
      * The application's middleware aliases.
      *
-     * Aliases may be used to conveniently assign middleware to routes and groups.
+     * Aliases may be used instead of class names to conveniently assign middleware to routes and groups.
      *
      * @var array<string, class-string|string>
      */
@@ -64,6 +68,15 @@ class Kernel extends HttpKernel
         'signed' => \App\Http\Middleware\ValidateSignature::class,
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
-        'check.subscription.expiry' => \App\Http\Middleware\CheckSubscriptionExpiry::class,
+        
+        // Custom middleware aliases
+        'admin' => \App\Http\Middleware\AdminMiddleware::class,
+        'check.subscription' => \App\Http\Middleware\CheckSubscription::class,
+        'subscription.expiry' => \App\Http\Middleware\CheckSubscriptionExpiry::class,
+        'check.payment' => \App\Http\Middleware\CheckPaymentAccess::class,
+        'gender.content' => \App\Http\Middleware\GenderContentMiddleware::class,
+        'role' => \App\Http\Middleware\RoleMiddleware::class,
+        'rate.limit' => \App\Http\Middleware\RateLimitMiddleware::class,
+        'check.session' => \App\Http\Middleware\CheckSessionMiddleware::class,
     ];
 }
