@@ -32,4 +32,8 @@ class Comment extends Model
     {
         return $this->belongsTo(Lesson::class);
     }
+    public function course()
+{
+    return $this->belongsTo(Course::class, 'course_id');
+}
 }

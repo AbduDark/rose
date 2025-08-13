@@ -1,272 +1,336 @@
 <?php
 
-namespace App\Services;
+namespace App\Utils;
 
-use Illuminate\Support\Facades\{Log, Storage};
+use Intervention\Image\ImageManager ;;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\Facades\Image;
 
 
+
+
+
+
+
+/**
+ * CourseImageGenerator
+ *
+ * Generates course images by selecting a random template and adding text/logo
+ * based on predefined coordinates for each template.
+ */
 class CourseImageGenerator
 {
+    private array $templates;
+
+    private string $defaultFont;
+
+    public function __construct()
+    {
+        $this->templates = [
+            [
+                'id' => 'tpl1',
+                'file' => storage_path('app/templates/template1.jpg'),
+                'positions' => [
+                    'title' => ['x' => 60, 'y' => 80,  'width' => 620, 'size' => 36, 'color' => '#ffffff', 'align' => 'left'],
+                    'price' => ['x' => 60, 'y' => 420, 'width' => 300, 'size' => 22, 'color' => '#ffd700', 'align' => 'left'],
+                    'grade' => ['x' => 60, 'y' => 460, 'width' => 300, 'size' => 18, 'color' => '#ffffff', 'align' => 'left'],
+                    'description' => ['x' => 60, 'y' => 130, 'width' => 620, 'size' => 18, 'color' => '#ffffff', 'align' => 'left'],
+                    'logo' => ['x' => 40, 'y' => 520, 'size' => 40, 'align' => 'left']
+                ]
+            ],
+            [
+                'id' => 'tpl2',
+                'file' => storage_path('app/templates/template2.jpg'),
+                'positions' => [
+                    'title' => ['x' => 80, 'y' => 120, 'width' => 560, 'size' => 34, 'color' => '#000000', 'align' => 'left'],
+                    'price' => ['x' => 620, 'y' => 120, 'width' => 200, 'size' => 20, 'color' => '#000000', 'align' => 'right'],
+                    'grade' => ['x' => 80, 'y' => 420, 'width' => 560, 'size' => 18, 'color' => '#000000', 'align' => 'left'],
+                    'description' => ['x' => 80, 'y' => 170, 'width' => 560, 'size' => 16, 'color' => '#333333', 'align' => 'left'],
+                    'logo' => ['x' => 60, 'y' => 520, 'size' => 36, 'align' => 'left']
+                ]
+            ],
+            [
+                'id' => 'tpl3',
+                'file' => storage_path('app/templates/template3.jpg'),
+                'positions' => [
+                    'title' => ['x' => 100, 'y' => 60,  'width' => 520, 'size' => 38, 'color' => '#ffffff', 'align' => 'left'],
+                    'price' => ['x' => 100, 'y' => 420, 'width' => 300, 'size' => 20, 'color' => '#ffffff', 'align' => 'left'],
+                    'grade' => ['x' => 100, 'y' => 455, 'width' => 300, 'size' => 18, 'color' => '#ffffff', 'align' => 'left'],
+                    'description' => ['x' => 100, 'y' => 110, 'width' => 520, 'size' => 16, 'color' => '#ffffff', 'align' => 'left'],
+                    'logo' => ['x' => 660, 'y' => 520, 'size' => 34, 'align' => 'right']
+                ]
+            ],
+            [
+                'id' => 'tpl4',
+                'file' => storage_path('app/templates/template4.jpg'),
+                'positions' => [
+                    'title' => ['x' => 40, 'y' => 40,  'width' => 720, 'size' => 40, 'color' => '#ffffff', 'align' => 'center'],
+                    'price' => ['x' => 40, 'y' => 500, 'width' => 350, 'size' => 24, 'color' => '#ffffff', 'align' => 'left'],
+                    'grade' => ['x' => 420, 'y' => 500, 'width' => 350, 'size' => 20, 'color' => '#ffffff', 'align' => 'right'],
+                    'description' => ['x' => 40, 'y' => 120, 'width' => 720, 'size' => 18, 'color' => '#ffffff', 'align' => 'center'],
+                    'logo' => ['x' => 680, 'y' => 40, 'size' => 40, 'align' => 'right']
+                ]
+            ],
+            [
+                'id' => 'tpl5',
+                'file' => storage_path('app/templates/template5.jpg'),
+                'positions' => [
+                    'title' => ['x' => 60, 'y' => 100, 'width' => 600, 'size' => 36, 'color' => '#ffffff', 'align' => 'left'],
+                    'price' => ['x' => 60, 'y' => 420, 'width' => 300, 'size' => 22, 'color' => '#00ff00', 'align' => 'left'],
+                    'grade' => ['x' => 60, 'y' => 460, 'width' => 300, 'size' => 18, 'color' => '#ffffff', 'align' => 'left'],
+                    'description' => ['x' => 60, 'y' => 150, 'width' => 600, 'size' => 16, 'color' => '#ffffff', 'align' => 'left'],
+                    'logo' => ['x' => 40, 'y' => 520, 'size' => 36, 'align' => 'left']
+                ]
+            ],
+        ];
+
+        $this->defaultFont = public_path('fonts/Cairo-Regular.ttf');
+    }
+
     /**
-     * قائمة القوالب المتاحة
+     * Generate course image with provided data
+     *
+     * @param array $data Required keys: title, Optional: price, grade, description, instructor, logo_path, currency
+     * @return string Relative path to the generated image
+     * @throws \InvalidArgumentException
      */
-    
-    private array $templates = [
-        'template1.jpg',
-        'template2.jpg',
-        'template3.jpg',
-        'template4.jpg',
-        'template5.jpg'
-    ];
-
-    private array $colors = [
-        ['#e74c3c', '#c0392b'], // أحمر
-        ['#3498db', '#2980b9'], // أزرق
-        ['#2ecc71', '#27ae60'], // أخضر
-        ['#f39c12', '#e67e22'], // برتقالي
-        ['#9b59b6', '#8e44ad'], // بنفسجي
-    ];
-
-        public function generateCourseImage(string $title, float $price, string $description, string $grade): string
-{
-    try {
-        $coursesPath = public_path('uploads/courses');
-        if (!file_exists($coursesPath)) {
-            mkdir($coursesPath, 0755, true);
+    public function generateCourseImage(array $data): string
+    {
+        if (empty($data['title'])) {
+            throw new \InvalidArgumentException('Title is required for course image generation');
         }
 
-        $image = $this->createSimpleImage($title, $price, $description, $grade);
+        $tpl = $this->templates[array_rand($this->templates)];
 
-        if (!$image) {
-            Log::warning('Failed to create image with GD, trying fallback method');
-            return $this->createFallbackImage($title, $price, $grade);
+        if (!file_exists($tpl['file'])) {
+            Log::warning("Template file not found: {$tpl['file']}");
+            return $this->createFallbackImage($data);
         }
 
-        $filename = uniqid() . '_course.jpg';
-        $relativePath = 'uploads/courses/' . $filename; // بدون 'public/'
+        try {
+            $img = Image::make($tpl['file']);
+            $fontPath = file_exists($this->defaultFont) ? $this->defaultFont : null;
+
+            $this->addTextElements($img, $tpl, $data, $fontPath);
+
+            if (!empty($data['logo_path']) && file_exists($data['logo_path']) && !empty($tpl['positions']['logo'])) {
+                $this->addLogo($img, $data['logo_path'], $tpl['positions']['logo']);
+            }
+
+            return $this->saveImage($img);
+        } catch (\Exception $e) {
+            Log::error('Course image generation failed: ' . $e->getMessage());
+            return $this->createFallbackImage($data);
+        }
+    }
+
+    private function addTextElements($img, array $tpl, array $data, ?string $fontPath): void
+    {
+        foreach (['title', 'description', 'price', 'grade'] as $field) {
+            if (empty($tpl['positions'][$field])) continue;
+
+            $text = $this->getFieldText($field, $data);
+            if (empty($text)) continue;
+
+            $pos = $tpl['positions'][$field];
+            $this->drawTextBox(
+                $img,
+                $text,
+                $pos['x'],
+                $pos['y'],
+                $pos['width'] ?? 400,
+                $fontPath,
+                $pos['size'] ?? 18,
+                $pos['color'] ?? '#000000',
+                $pos['align'] ?? 'left'
+            );
+        }
+
+        if (!empty($data['instructor']) && !empty($tpl['positions']['instructor'])) {
+            $pos = $tpl['positions']['instructor'];
+            $this->drawTextBox(
+                $img,
+                $data['instructor'],
+                $pos['x'],
+                $pos['y'],
+                $pos['width'] ?? 200,
+                $fontPath,
+                $pos['size'] ?? 16,
+                $pos['color'] ?? '#fff',
+                $pos['align'] ?? 'left'
+            );
+        }
+    }
+
+    private function getFieldText(string $field, array $data): string
+    {
+        switch ($field) {
+            case 'title':
+                return $data['title'] ?? '';
+            case 'description':
+                return $data['description'] ?? '';
+            case 'price':
+                return isset($data['price']) ? $data['price'] . ' ' . ($data['currency'] ?? 'جنيه') : '';
+            case 'grade':
+                return $data['grade'] ?? '';
+            default:
+                return '';
+        }
+    }
+
+    private function addLogo($img, string $logoPath, array $position): void
+    {
+        try {
+            $logo = Image::make($logoPath);
+            $logoSize = $position['size'] ?? 40;
+            $logo->resize($logoSize, null, function ($constraint) {
+                $constraint->aspectRatio();
+                $constraint->upsize();
+            });
+
+            $destX = $this->computeX($img->width(), $position['x'], $position['align'] ?? 'left', $logo->width());
+            $destY = $position['y'];
+            $img->insert($logo, 'top-left', $destX, $destY);
+        } catch (\Exception $e) {
+            Log::warning('Failed to insert logo: ' . $e->getMessage());
+        }
+    }
+
+    private function saveImage($img): string
+    {
+        $filename = Str::slug(uniqid('course_')) . '.jpg';
+        $relativePath = 'uploads/courses/' . $filename;
         $fullPath = public_path($relativePath);
 
-        if (imagejpeg($image, $fullPath, 85)) {
-            imagedestroy($image);
-            return $relativePath; // إرجاع المسار النسبي فقط
+        $directory = dirname($fullPath);
+        if (!file_exists($directory) && !mkdir($directory, 0755, true)) {
+            throw new \RuntimeException("Failed to create directory: {$directory}");
         }
 
-        imagedestroy($image);
-        throw new \Exception('Failed to save image');
-    } catch (\Exception $e) {
-        return $this->createFallbackImage($title, $price, $grade);
-    }
-}
-
-
-
-    private function createSimpleImage(string $title, float $price, string $description, string $grade)
-    {
-        // إنشاء صورة بحجم 800x600
-        $image = imagecreatetruecolor(800, 600);
-
-        if (!$image) {
-            return false;
-        }
-
-        // اختيار لون عشوائي
-        $colorScheme = $this->colors[array_rand($this->colors)];
-
-        // تحويل الألوان من hex إلى RGB
-        $bgColor = $this->hexToRgb($colorScheme[0]);
-        $accentColor = $this->hexToRgb($colorScheme[1]);
-
-        // إنشاء الألوان
-        $backgroundColor = imagecolorallocate($image, $bgColor[0], $bgColor[1], $bgColor[2]);
-        $accentBgColor = imagecolorallocate($image, $accentColor[0], $accentColor[1], $accentColor[2]);
-        $white = imagecolorallocate($image, 255, 255, 255);
-        $darkGray = imagecolorallocate($image, 51, 51, 51);
-
-        // تعبئة الخلفية
-        imagefill($image, 0, 0, $backgroundColor);
-
-        // رسم شكل زخرفي
-        imagefilledrectangle($image, 0, 0, 800, 150, $accentBgColor);
-        imagefilledrectangle($image, 0, 450, 800, 600, $accentBgColor);
-
-        // إضافة النصوص
-        $this->addTextToImage($image, $title, $price, $grade, $white, $darkGray);
-
-        return $image;
+        $img->save($fullPath, 88);
+        return $relativePath;
     }
 
-    private function addTextToImage($image, string $title, float $price, string $grade, $whiteColor, $darkColor)
+    private function drawTextBox($img, string $text, int $x, int $y, int $boxWidth, ?string $fontPath, int $fontSize, string $hexColor, string $align = 'left'): void
     {
-        // تحديد مسار الخط - استخدام الخط المدمج إذا لم يوجد خط مخصص
-        $fontPath = base_path('public/fonts/NotoSansArabic-Bold.ttf');
-        $useCustomFont = file_exists($fontPath);
+        $lines = $this->wrapTextToLines($text, $fontPath, $fontSize, $boxWidth);
+        $lineHeight = (int)($fontSize * 1.25);
+        $startX = $this->computeX($img->width(), $x, $align, null);
 
-        // عنوان الكورس
-        $titleText = $this->truncateText($title, 40);
-        if ($useCustomFont) {
-            imagettftext($image, 24, 0, 50, 100, $whiteColor, $fontPath, $titleText);
-        } else {
-            imagestring($image, 5, 50, 70, $titleText, $whiteColor);
-        }
-
-        // السعر
-        $priceText = $price . ' جنيه';
-        if ($useCustomFont) {
-            imagettftext($image, 20, 0, 50, 300, $darkColor, $fontPath, $priceText);
-        } else {
-            imagestring($image, 4, 50, 280, $priceText, $darkColor);
-        }
-
-        // الصف الدراسي
-        $gradeText = 'الصف ' . $grade;
-        if ($useCustomFont) {
-            imagettftext($image, 18, 0, 50, 350, $darkColor, $fontPath, $gradeText);
-        } else {
-            imagestring($image, 3, 50, 330, $gradeText, $darkColor);
-        }
-
-        // شعار الأكاديمية
-        $logoText = '🌹 أكاديمية الوردة';
-        if ($useCustomFont) {
-            imagettftext($image, 16, 0, 550, 550, $whiteColor, $fontPath, $logoText);
-        } else {
-            imagestring($image, 3, 550, 530, $logoText, $whiteColor);
+        foreach ($lines as $i => $line) {
+            $lineY = $y + ($i * $lineHeight);
+            $img->text($line, $startX, $lineY, function ($font) use ($fontPath, $fontSize, $hexColor, $align) {
+                if ($fontPath) {
+                    $font->file($fontPath);
+                }
+                $font->size($fontSize);
+                $font->color($hexColor);
+                $font->align($align);
+                $font->valign('top');
+            });
         }
     }
 
-  private function createFallbackImage(string $title, float $price, string $grade): string
+    private function wrapTextToLines(string $text, ?string $fontFile, int $fontSize, int $maxWidth): array
     {
-        try {
-            // إنشاء مجلد إذا لم يكن موجود
-            $coursesPath = public_path('uploads/courses');
-            if (!file_exists($coursesPath)) {
-                mkdir($coursesPath, 0755, true);
+        if (!$fontFile || !file_exists($fontFile)) {
+            $approx = max(10, (int)($maxWidth / 10));
+            $words = explode(' ', $text);
+            $lines = [];
+            $current = '';
+
+            foreach ($words as $w) {
+                if (mb_strlen($current . ' ' . $w) <= $approx) {
+                    $current = trim($current . ' ' . $w);
+                } else {
+                    if ($current !== '') $lines[] = $current;
+                    $current = $w;
+                }
             }
-
-            // إنشاء SVG
-            $svgContent = $this->generateSVGImage($title, $price, $grade);
-
-            $filename = uniqid() . '_fallback.svg';
-            $relativePath = 'uploads/courses/' . $filename;
-            $fullPath = public_path($relativePath);
-
-            if (file_put_contents($fullPath, $svgContent)) {
-                Log::info('Fallback SVG image created', ['path' => $relativePath]);
-                return $relativePath;
-            }
-
-            throw new \Exception('Failed to save SVG');
-
-        } catch (\Exception $e) {
-            Log::error('Failed to create fallback image: ' . $e->getMessage());
-
-            // كملاذ أخير، إنشاء صورة افتراضية
-            $filename = 'default_' . md5($title . $price) . '.jpg';
-            $relativePath = 'uploads/courses/' . $filename;
-            $fullPath = public_path($relativePath);
-
-            $defaultContent = base64_decode('data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
-            file_put_contents($fullPath, $defaultContent);
-
-            return $relativePath;
-        }
-    }
-
-    private function generateSVGImage(string $title, float $price, string $grade): string
-    {
-        $colorScheme = $this->colors[array_rand($this->colors)];
-        $titleText = htmlspecialchars($this->truncateText($title, 30));
-        $priceText = htmlspecialchars($price . ' جنيه');
-        $gradeText = htmlspecialchars('الصف ' . $grade);
-
-        return <<<SVG
-<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
-    <rect width="800" height="600" fill="{$colorScheme[0]}"/>
-    <rect width="800" height="150" fill="{$colorScheme[1]}"/>
-    <rect y="450" width="800" height="150" fill="{$colorScheme[1]}"/>
-
-    <text x="50" y="100" font-family="Arial, sans-serif" font-size="24" fill="white" font-weight="bold">{$titleText}</text>
-    <text x="50" y="300" font-family="Arial, sans-serif" font-size="20" fill="#333">{$priceText}</text>
-    <text x="50" y="350" font-family="Arial, sans-serif" font-size="18" fill="#333">{$gradeText}</text>
-    <text x="550" y="550" font-family="Arial, sans-serif" font-size="16" fill="white">🌹 أكاديمية الوردة</text>
-</svg>
-SVG;
-    }
-
-    private function hexToRgb(string $hex): array
-    {
-        $hex = str_replace('#', '', $hex);
-        return [
-            hexdec(substr($hex, 0, 2)),
-            hexdec(substr($hex, 2, 2)),
-            hexdec(substr($hex, 4, 2))
-        ];
-    }
-
-    private function truncateText(string $text, int $length): string
-    {
-        return mb_strlen($text) > $length ? mb_substr($text, 0, $length) . '...' : $text;
-    }
-
-    public function copyTemplatesToStorage(): void
-    {
-        $templatesDir = storage_path('app/templates');
-
-        if (!file_exists($templatesDir)) {
-            mkdir($templatesDir, 0755, true);
-            Log::info('Created templates directory');
+            if ($current !== '') $lines[] = $current;
+            return $lines;
         }
 
-        // إنشاء قوالب وهمية إذا لم توجد
-        for ($i = 1; $i <= 5; $i++) {
-            $templatePath = $templatesDir . "/template{$i}.jpg";
-            if (!file_exists($templatePath)) {
-                $this->createDummyTemplate($templatePath, $i);
+        $words = preg_split('/\s+/u', trim($text));
+        $lines = [];
+        $current = '';
+
+        foreach ($words as $word) {
+            $try = $current === '' ? $word : $current . ' ' . $word;
+            $box = imagettfbbox($fontSize, 0, $fontFile, $try);
+            $width = abs($box[2] - $box[0]);
+
+            if ($width <= $maxWidth) {
+                $current = $try;
+            } else {
+                if ($current !== '') $lines[] = $current;
+
+                $wbox = imagettfbbox($fontSize, 0, $fontFile, $word);
+                $wwidth = abs($wbox[2] - $wbox[0]);
+
+                if ($wwidth <= $maxWidth) {
+                    $current = $word;
+                } else {
+                    $chars = preg_split('//u', $word, -1, PREG_SPLIT_NO_EMPTY);
+                    $piece = '';
+
+                    foreach ($chars as $ch) {
+                        $tryPiece = $piece . $ch;
+                        $b = imagettfbbox($fontSize, 0, $fontFile, $tryPiece);
+                        $pw = abs($b[2] - $b[0]);
+
+                        if ($pw <= $maxWidth) {
+                            $piece = $tryPiece;
+                        } else {
+                            if ($piece !== '') $lines[] = $piece;
+                            $piece = $ch;
+                        }
+                    }
+                    $current = $piece !== '' ? $piece : '';
+                }
             }
         }
+
+        if ($current !== '') $lines[] = $current;
+        return $lines;
     }
 
-    private function createDummyTemplate(string $path, int $templateNumber): void
+    private function computeX(int $imgWidth, int $x, string $align = 'left', ?int $elementWidth = null): int
     {
-        try {
-            $image = imagecreatetruecolor(800, 600);
-            $colorScheme = $this->colors[($templateNumber - 1) % count($this->colors)];
+        $align = strtolower($align);
 
-            $bgColor = $this->hexToRgb($colorScheme[0]);
-            $accentColor = $this->hexToRgb($colorScheme[1]);
-
-            $backgroundColor = imagecolorallocate($image, $bgColor[0], $bgColor[1], $bgColor[2]);
-            $accentBgColor = imagecolorallocate($image, $accentColor[0], $accentColor[1], $accentColor[2]);
-
-            imagefill($image, 0, 0, $backgroundColor);
-
-            // إضافة بعض الأشكال الزخرفية
-            switch ($templateNumber) {
-                case 1:
-                    imagefilledrectangle($image, 0, 0, 800, 100, $accentBgColor);
-                    break;
-                case 2:
-                    imagefilledellipse($image, 400, 300, 600, 400, $accentBgColor);
-                    break;
-                case 3:
-                    imagefilledrectangle($image, 600, 0, 800, 600, $accentBgColor);
-                    break;
-                case 4:
-                    imagefilledrectangle($image, 0, 500, 800, 600, $accentBgColor);
-                    break;
-                case 5:
-                    imagefilledrectangle($image, 0, 0, 200, 600, $accentBgColor);
-                    break;
+        if ($align === 'center') {
+            if ($elementWidth) {
+                return (int)(($imgWidth / 2) - ($elementWidth / 2) + $x);
             }
-
-            imagejpeg($image, $path, 85);
-            imagedestroy($image);
-
-            Log::info("Created dummy template: template{$templateNumber}.jpg");
-
-        } catch (\Exception $e) {
-            Log::error("Failed to create dummy template {$templateNumber}: " . $e->getMessage());
+            return (int)($imgWidth / 2);
         }
+
+        if ($align === 'right') {
+            if ($elementWidth) {
+                return max(0, $imgWidth - $x - $elementWidth);
+            }
+            return max(0, $imgWidth - $x);
+        }
+
+        return $x;
+    }
+    private function createFallbackImage(array $data): string
+    {
+        $img = Image::canvas(800, 600, '#2d3748');
+        $fontPath = file_exists($this->defaultFont) ? $this->defaultFont : null;
+
+        $title = $data['title'] ?? 'Course';
+        $img->text($title, 400, 200, function ($font) use ($fontPath) {
+            if ($fontPath) $font->file($fontPath);
+            $font->size(32);
+            $font->color('#ffffff');
+            $font->align('center');
+            $font->valign('top');
+        });
+
+        return $this->saveImage($img);
     }
 }

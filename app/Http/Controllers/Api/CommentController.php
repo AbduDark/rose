@@ -18,93 +18,95 @@ class CommentController extends Controller
 {
     use ApiResponseTrait;
 
-    public function store(Request $request)
-    {
-        try {
-            $validator = Validator::make($request->all(), [
-                'lesson_id' => 'required|exists:lessons,id',
-                'content' => 'required|string|max:1000'
-            ]);
+   public function store(Request $request)
+{
+    try {
+        $validator = Validator::make($request->all(), [
+            'lesson_id' => 'required|exists:lessons,id',
+            'content' => 'required|string|max:1000'
+        ]);
 
-            if ($validator->fails()) {
-                 throw new ValidationException($validator);
-            }
-
-            /** @var User $user */
-            $user = Auth::user();
-            $lesson = Lesson::findOrFail($request->lesson_id);
-
-            // Check if user is subscribed to the course or is admin
-            if (!$user->Role === 'admin' && !$user->subscriptions()->where('course_id', $lesson->course_id)->exists()) {
-                return $this->errorResponse([
-                    'ar' => 'يجب أن تكون مشتركاً في الكورس لإضافة تعليق',
-                    'en' => 'You must be subscribed to the course to add a comment'
-                ], 403);
-            }
-
-            $comment = Comment::create([
-                'user_id' => $user->id,
-                'lesson_id' => $request->lesson_id,
-                'content' => $request->content,
-                'is_approved' => $user->Role === 'admin'
-            ]);
-
-            return $this->successResponse([
-                'comment' => $comment->load(['user', 'lesson'])
-            ], [
-                'ar' => 'تم إضافة التعليق بنجاح',
-                'en' => 'Comment added successfully'
-            ]);
-
-        } catch (ModelNotFoundException $e) {
-            return $this->errorResponse([
-                'ar' => 'الدرس المطلوب غير موجود',
-                'en' => 'The requested lesson does not exist'
-            ], 404);
-        } catch (ValidationException $e) {
-            return $this->validationErrorResponse($e);
-        } catch (\Exception $e) {
-            return $this->serverErrorResponse();
+        if ($validator->fails()) {
+             throw new ValidationException($validator);
         }
+
+        /** @var User $user */
+        $user = Auth::user();
+        $lesson = Lesson::with('course')->findOrFail($request->lesson_id);
+
+        // التحقق من اشتراك المستخدم في الكورس أو إذا كان مديراً
+        if ($user->Role !== 'admin' && !$user->subscriptions()->where('course_id', $lesson->course_id)->exists()) {
+            return $this->errorResponse([
+                'ar' => 'يجب أن تكون مشتركاً في الكورس لإضافة تعليق',
+                'en' => 'You must be subscribed to the course to add a comment'
+            ], 403);
+        }
+
+        $comment = Comment::create([
+            'user_id' => $user->id,
+            'lesson_id' => $lesson->id,
+            'course_id' => $lesson->course_id, // إضافة معرف الكورس
+            'content' => $request->content,
+            'is_approved' => $user->Role === 'admin'
+        ]);
+
+        $message = $user->Role === 'admin'
+            ? ['ar' => 'تم إضافة التعليق بنجاح', 'en' => 'Comment added successfully']
+            : ['ar' => 'تم إضافة التعليق وسيظهر بعد الموافقة عليه', 'en' => 'Comment added and will appear after approval'];
+
+        return $this->successResponse([
+            'comment' => $comment->load(['user', 'lesson', 'course'])
+        ], $message);
+
+    } catch (ModelNotFoundException $e) {
+        return $this->errorResponse([
+            'ar' => 'الدرس المطلوب غير موجود',
+            'en' => 'The requested lesson does not exist'
+        ], 404);
+    } catch (ValidationException $e) {
+        return $this->validationErrorResponse($e);
+    } catch (\Exception $e) {
+        return $this->serverErrorResponse();
     }
+}
 
     public function getLessonComments($lessonId)
-    {
-        try {
-            $lesson = Lesson::findOrFail($lessonId);
-            /** @var User $user */
-            $user = Auth::user();
+{
+    try {
+        $lesson = Lesson::with('course')->findOrFail($lessonId);
+        /** @var User $user */
+        $user = Auth::user();
 
-            // Check if user is subscribed to the course or is admin
-            if (!$user->Role === 'admin' && !$user->subscriptions()->where('course_id', $lesson->course_id)->exists()) {
-                return $this->errorResponse([
-                    'ar' => 'يجب أن تكون مشتركاً في الكورس لعرض التعليقات',
-                    'en' => 'You must be subscribed to the course to view comments'
-                ], 403);
-            }
-
-            $comments = Comment::where('lesson_id', $lessonId)
-                ->where('is_approved', true)
-                ->with(['user'])
-                ->latest()
-                ->get();
-
-            return $this->successResponse([
-                'comments' => $comments
-            ], [
-                'ar' => 'تم جلب التعليقات بنجاح',
-                'en' => 'Comments retrieved successfully'
-            ]);
-
-        } catch (ModelNotFoundException $e) {
+        // التحقق من اشتراك المستخدم في الكورس أو إذا كان مديراً
+        if ($user->Role !== 'admin' && !$user->subscriptions()->where('course_id', $lesson->course_id)->exists()) {
             return $this->errorResponse([
-                'ar' => 'الدرس المطلوب غير موجود',
-                'en' => 'The requested lesson does not exist'
-            ], 404);
-        } catch (\Exception $e) {
-            return $this->serverErrorResponse();
+                'ar' => 'يجب أن تكون مشتركاً في الكورس لعرض التعليقات',
+                'en' => 'You must be subscribed to the course to view comments'
+            ], 403);
         }
+
+        $comments = Comment::where('lesson_id', $lessonId)
+            ->where('is_approved', true)
+            ->with(['user', 'lesson', 'course'])
+            ->latest()
+            ->get();
+
+        return $this->successResponse([
+            'comments' => $comments
+        ], [
+            'ar' => 'تم جلب التعليقات بنجاح',
+            'en' => 'Comments retrieved successfully'
+        ]);
+
+    } catch (ModelNotFoundException $e) {
+        return $this->errorResponse([
+            'ar' => 'الدرس المطلوب غير موجود',
+            'en' => 'The requested lesson does not exist'
+        ], 404);
+    } catch (\Exception $e) {
+        return $this->serverErrorResponse();
     }
+}
 
     public function approveComment($id)
     {
@@ -130,35 +132,43 @@ class CommentController extends Controller
         }
     }
 
-    public function destroy($id)
-    {
-        try {
-            $comment = Comment::findOrFail($id);
-            /** @var User $user */
-            $user = Auth::user();
+   public function destroy($id)
+{
+    try {
+        $comment = Comment::with(['lesson', 'course'])->findOrFail($id);
+        /** @var User $user */
+        $user = Auth::user();
 
-            // Allow deletion if user owns the comment or is admin
-            if ($comment->user_id !== $user->id && !$user->Role === 'admin') {
-                return $this->errorResponse([
-                    'ar' => 'غير مصرح لك بحذف هذا التعليق',
-                    'en' => 'You are not authorized to delete this comment'
-                ], 403);
-            }
-
-            $comment->delete();
-
-            return $this->successResponse(null, [
-                'ar' => 'تم حذف التعليق بنجاح',
-                'en' => 'Comment deleted successfully'
-            ]);
-
-        } catch (ModelNotFoundException $e) {
+        // السماح بالحذف إذا كان المستخدم صاحب التعليق أو مديراً
+        if ($comment->user_id !== $user->id && $user->Role !== 'admin') {
             return $this->errorResponse([
-                'ar' => 'التعليق المطلوب غير موجود',
-                'en' => 'The requested comment does not exist'
-            ], 404);
-        } catch (\Exception $e) {
-            return $this->serverErrorResponse();
+                'ar' => 'غير مصرح لك بحذف هذا التعليق',
+                'en' => 'You are not authorized to delete this comment'
+            ], 403);
         }
+
+        // إذا كان التعليق معتمداً، لا يسمح إلا للمدير بحذفه
+        if ($comment->is_approved && $user->Role !== 'admin') {
+            return $this->errorResponse([
+                'ar' => 'لا يمكن حذف تعليق معتمد إلا بواسطة المدير',
+                'en' => 'Only admin can delete approved comments'
+            ], 403);
+        }
+
+        $comment->delete();
+
+        return $this->successResponse(null, [
+            'ar' => 'تم حذف التعليق بنجاح',
+            'en' => 'Comment deleted successfully'
+        ]);
+
+    } catch (ModelNotFoundException $e) {
+        return $this->errorResponse([
+            'ar' => 'التعليق المطلوب غير موجود',
+            'en' => 'The requested comment does not exist'
+        ], 404);
+    } catch (\Exception $e) {
+        return $this->serverErrorResponse();
     }
+}
 }
