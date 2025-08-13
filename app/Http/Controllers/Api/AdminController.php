@@ -295,6 +295,7 @@ class AdminController extends BaseController
                 'status' => 'approved',
                 'is_approved' => true,
                 'is_active' => true,
+                'expires_at' => now()->addDays(30), // اشتراك شهري (30 يوم)
                 'approved_at' => now(),
                 'approved_by' => Auth::id(),
                 'admin_notes' => $request->get('admin_notes')

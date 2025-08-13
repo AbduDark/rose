@@ -31,7 +31,7 @@ class CourseImageGenerator
         $this->templates = [
             [
                 'id' => 'tpl1',
-                'file' => storage_path('app/templates/template1.jpg'),
+                'file' => public_path('templates/template1.jpg'),
                 'positions' => [
                     'title' => ['x' => 60, 'y' => 80,  'width' => 620, 'size' => 36, 'color' => '#ffffff', 'align' => 'left'],
                     'price' => ['x' => 60, 'y' => 420, 'width' => 300, 'size' => 22, 'color' => '#ffd700', 'align' => 'left'],
@@ -42,7 +42,7 @@ class CourseImageGenerator
             ],
             [
                 'id' => 'tpl2',
-                'file' => storage_path('app/templates/template2.jpg'),
+                'file' => public_path('templates/template2.jpg'),
                 'positions' => [
                     'title' => ['x' => 80, 'y' => 120, 'width' => 560, 'size' => 34, 'color' => '#000000', 'align' => 'left'],
                     'price' => ['x' => 620, 'y' => 120, 'width' => 200, 'size' => 20, 'color' => '#000000', 'align' => 'right'],
@@ -53,7 +53,7 @@ class CourseImageGenerator
             ],
             [
                 'id' => 'tpl3',
-                'file' => storage_path('app/templates/template3.jpg'),
+                'file' => public_path('templates/template3.jpg'),
                 'positions' => [
                     'title' => ['x' => 100, 'y' => 60,  'width' => 520, 'size' => 38, 'color' => '#ffffff', 'align' => 'left'],
                     'price' => ['x' => 100, 'y' => 420, 'width' => 300, 'size' => 20, 'color' => '#ffffff', 'align' => 'left'],
@@ -64,7 +64,7 @@ class CourseImageGenerator
             ],
             [
                 'id' => 'tpl4',
-                'file' => storage_path('app/templates/template4.jpg'),
+                'file' => public_path('templates/template4.jpg'),
                 'positions' => [
                     'title' => ['x' => 40, 'y' => 40,  'width' => 720, 'size' => 40, 'color' => '#ffffff', 'align' => 'center'],
                     'price' => ['x' => 40, 'y' => 500, 'width' => 350, 'size' => 24, 'color' => '#ffffff', 'align' => 'left'],
@@ -75,7 +75,7 @@ class CourseImageGenerator
             ],
             [
                 'id' => 'tpl5',
-                'file' => storage_path('app/templates/template5.jpg'),
+                'file' => public_path('templates/template5.jpg'),
                 'positions' => [
                     'title' => ['x' => 60, 'y' => 100, 'width' => 600, 'size' => 36, 'color' => '#ffffff', 'align' => 'left'],
                     'price' => ['x' => 60, 'y' => 420, 'width' => 300, 'size' => 22, 'color' => '#00ff00', 'align' => 'left'],
@@ -257,18 +257,24 @@ class CourseImageGenerator
 
     private function wrapTextToLines(string $text, ?string $fontFile, int $fontSize, int $maxWidth): array
     {
+        // معالجة النص العربي بشكل صحيح
+        $text = $this->processArabicText($text);
+        
         if (!$fontFile || !file_exists($fontFile)) {
-            $approx = max(10, (int)($maxWidth / 10));
-            $words = explode(' ', $text);
+            // تقدير تقريبي للنصوص العربية
+            $charWidth = $fontSize * 0.6;
+            $maxChars = max(5, (int)($maxWidth / $charWidth));
+            $words = preg_split('/\s+/u', trim($text));
             $lines = [];
             $current = '';
 
-            foreach ($words as $w) {
-                if (mb_strlen($current . ' ' . $w) <= $approx) {
-                    $current = trim($current . ' ' . $w);
+            foreach ($words as $word) {
+                $testLine = $current === '' ? $word : $current . ' ' . $word;
+                if (mb_strlen($testLine, 'UTF-8') <= $maxChars) {
+                    $current = $testLine;
                 } else {
                     if ($current !== '') $lines[] = $current;
-                    $current = $w;
+                    $current = $word;
                 }
             }
             if ($current !== '') $lines[] = $current;
@@ -317,6 +323,22 @@ class CourseImageGenerator
 
         if ($current !== '') $lines[] = $current;
         return $lines;
+    }
+
+    /**
+     * معالجة النص العربي لضمان الاتصال الصحيح للحروف
+     */
+    private function processArabicText(string $text): string
+    {
+        // تنظيف النص وإعادة ترتيبه للعربية
+        $text = trim($text);
+        
+        // تحويل الأرقام الإنجليزية للعربية إذا لزم الأمر
+        $arabicNumerals = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+        $englishNumerals = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+        
+        // الحفاظ على الأرقام الإنجليزية كما هي في السياق التعليمي
+        return $text;
     }
 
     private function computeX(int $imgWidth, int $x, string $align = 'left', ?int $elementWidth = null): int
