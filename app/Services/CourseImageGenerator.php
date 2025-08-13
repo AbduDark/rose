@@ -1,3 +1,4 @@
+
 <?php
 
 namespace App\Services;
@@ -23,16 +24,17 @@ class CourseImageGenerator
     {
         $this->templates = [
             [
-                'id' => 'tpl1',
+                'id' => 'template1',
                 'file' => public_path('templates/template1.jpg'),
                 'positions' => [
                     'title' => [
-                        'x' => 177,
-                        'y' => 177,
-                        'width' => 365,
+                        'x' => 790,
+                        'y' => 201,
+                        'width' => 435,
+                        'height' => 85,
                         'size' => 60,
                         'color' => '#ffffff',
-                        'align' => 'left',
+                        'align' => 'right',
                         'stroke' => [
                             'size' => 2,
                             'color' => '#ffffff'
@@ -44,22 +46,125 @@ class CourseImageGenerator
                             'range' => 50
                         ]
                     ],
-                    'price' => ['x' => 60, 'y' => 420, 'width' => 300, 'size' => 22, 'color' => '#ffd700', 'align' => 'left'],
-                    'grade' => ['x' => 60, 'y' => 460, 'width' => 300, 'size' => 18, 'color' => '#ffffff', 'align' => 'left'],
-                    'description' => ['x' => 60, 'y' => 130, 'width' => 620, 'size' => 18, 'color' => '#ffffff', 'align' => 'left'],
-                    'logo' => ['x' => 40, 'y' => 520, 'size' => 40, 'align' => 'left']
+                    'grade' => [
+                        'x' => 876,
+                        'y' => 307,
+                        'width' => 260,
+                        'height' => 79,
+                        'size' => 60,
+                        'color' => '#ffffff',
+                        'align' => 'right',
+                        'stroke' => [
+                            'size' => 2,
+                            'color' => '#ffffff'
+                        ],
+                        'outline' => [
+                            'color' => '#000000',
+                            'opacity' => 18,
+                            'size' => 13,
+                            'range' => 50
+                        ]
+                    ]
                 ]
             ],
-            // Other templates can be uncommented and updated as needed
+            [
+                'id' => 'template2',
+                'file' => public_path('templates/template2.jpg'),
+                'positions' => [
+                    'title' => [
+                        'x' => 773,
+                        'y' => 148,
+                        'width' => 356,
+                        'height' => 85,
+                        'size' => 60,
+                        'color' => '#ffffff',
+                        'align' => 'right',
+                        'stroke' => [
+                            'size' => 2,
+                            'color' => '#ffffff'
+                        ],
+                        'outline' => [
+                            'color' => '#000000',
+                            'opacity' => 18,
+                            'size' => 13,
+                            'range' => 50
+                        ]
+                    ],
+                    'grade' => [
+                        'x' => 829,
+                        'y' => 235,
+                        'width' => 244,
+                        'height' => 85,
+                        'size' => 60,
+                        'color' => '#ffffff',
+                        'align' => 'right',
+                        'stroke' => [
+                            'size' => 2,
+                            'color' => '#ffffff'
+                        ],
+                        'outline' => [
+                            'color' => '#000000',
+                            'opacity' => 18,
+                            'size' => 13,
+                            'range' => 50
+                        ]
+                    ]
+                ]
+            ],
+            [
+                'id' => 'template3',
+                'file' => public_path('templates/template3.jpg'),
+                'positions' => [
+                    'title' => [
+                        'x' => 760,
+                        'y' => 176,
+                        'width' => 365,
+                        'height' => 85,
+                        'size' => 60,
+                        'color' => '#ffffff',
+                        'align' => 'right',
+                        'stroke' => [
+                            'size' => 2,
+                            'color' => '#ffffff'
+                        ],
+                        'outline' => [
+                            'color' => '#000000',
+                            'opacity' => 18,
+                            'size' => 13,
+                            'range' => 50
+                        ]
+                    ],
+                    'grade' => [
+                        'x' => 805,
+                        'y' => 277,
+                        'width' => 258,
+                        'height' => 85,
+                        'size' => 60,
+                        'color' => '#ffffff',
+                        'align' => 'right',
+                        'stroke' => [
+                            'size' => 2,
+                            'color' => '#ffffff'
+                        ],
+                        'outline' => [
+                            'color' => '#000000',
+                            'opacity' => 18,
+                            'size' => 13,
+                            'range' => 50
+                        ]
+                    ]
+                ]
+            ]
         ];
 
-        $this->defaultFont = public_path('fonts/NotoSansArabic-Regular.ttf');
+        // استخدام خط عربي مناسب
+        $this->defaultFont = public_path('fonts/NotoSansArabic-Bold.ttf');
     }
 
     /**
      * Generate course image with provided data
      *
-     * @param array $data Required keys: title, Optional: price, grade, description, instructor, logo_path, currency
+     * @param array $data Required keys: title, grade. Optional: price, description, instructor, logo_path, currency
      * @return string Relative path to the generated image
      * @throws \InvalidArgumentException
      */
@@ -85,11 +190,8 @@ class CourseImageGenerator
 
             Log::info("Using font: " . ($fontPath ? $fontPath : 'system default'));
 
+            // إضافة العنوان والصف فقط
             $this->addTextElements($img, $tpl, $data, $fontPath);
-
-            if (!empty($data['logo_path']) && file_exists($data['logo_path']) && !empty($tpl['positions']['logo'])) {
-                $this->addLogo($img, $data['logo_path'], $tpl['positions']['logo']);
-            }
 
             $imagePath = $this->saveImage($img);
             Log::info("Course image generated successfully: {$imagePath}");
@@ -104,75 +206,38 @@ class CourseImageGenerator
 
     private function addTextElements($img, array $tpl, array $data, ?string $fontPath): void
     {
-        foreach (['title', 'description', 'price', 'grade'] as $field) {
-            if (empty($tpl['positions'][$field])) continue;
-
-            $text = $this->getFieldText($field, $data);
-            if (empty($text)) continue;
-
-            $pos = $tpl['positions'][$field];
+        // إضافة العنوان
+        if (!empty($data['title']) && !empty($tpl['positions']['title'])) {
+            $pos = $tpl['positions']['title'];
             $this->drawTextBox(
                 $img,
-                $text,
+                $this->processArabicText($data['title']),
                 $pos['x'],
                 $pos['y'],
-                $pos['width'] ?? 400,
+                $pos['width'],
                 $fontPath,
-                $pos['size'] ?? 18,
-                $pos['color'] ?? '#000000',
-                $pos['align'] ?? 'left',
-                $pos // Pass the entire position array for additional styling
-            );
-        }
-
-        if (!empty($data['instructor']) && !empty($tpl['positions']['instructor'])) {
-            $pos = $tpl['positions']['instructor'];
-            $this->drawTextBox(
-                $img,
-                $data['instructor'],
-                $pos['x'],
-                $pos['y'],
-                $pos['width'] ?? 200,
-                $fontPath,
-                $pos['size'] ?? 16,
-                $pos['color'] ?? '#fff',
-                $pos['align'] ?? 'left',
+                $pos['size'],
+                $pos['color'],
+                $pos['align'],
                 $pos
             );
         }
-    }
 
-    private function getFieldText(string $field, array $data): string
-    {
-        switch ($field) {
-            case 'title':
-                return $data['title'] ?? '';
-            case 'description':
-                return $data['description'] ?? '';
-            case 'price':
-                return isset($data['price']) ? $data['price'] . ' ' . ($data['currency'] ?? 'جنيه') : '';
-            case 'grade':
-                return $data['grade'] ?? '';
-            default:
-                return '';
-        }
-    }
-
-    private function addLogo($img, string $logoPath, array $position): void
-    {
-        try {
-            $logo = Image::make($logoPath);
-            $logoSize = $position['size'] ?? 40;
-            $logo->resize($logoSize, null, function ($constraint) {
-                $constraint->aspectRatio();
-                $constraint->upsize();
-            });
-
-            $destX = $this->computeX($img->width(), $position['x'], $position['align'] ?? 'left', $logo->width());
-            $destY = $position['y'];
-            $img->insert($logo, 'top-left', $destX, $destY);
-        } catch (\Exception $e) {
-            Log::warning('Failed to insert logo: ' . $e->getMessage());
+        // إضافة الصف
+        if (!empty($data['grade']) && !empty($tpl['positions']['grade'])) {
+            $pos = $tpl['positions']['grade'];
+            $this->drawTextBox(
+                $img,
+                $this->processArabicText($data['grade']),
+                $pos['x'],
+                $pos['y'],
+                $pos['width'],
+                $fontPath,
+                $pos['size'],
+                $pos['color'],
+                $pos['align'],
+                $pos
+            );
         }
     }
 
@@ -191,66 +256,65 @@ class CourseImageGenerator
         return $relativePath;
     }
 
-    private function drawTextBox($img, string $text, int $x, int $y, int $boxWidth, ?string $fontPath, int $fontSize, string $hexColor, string $align = 'left', array $position = []): void
+    private function drawTextBox($img, string $text, int $x, int $y, int $boxWidth, ?string $fontPath, int $fontSize, string $hexColor, string $align = 'right', array $position = []): void
     {
         try {
             $lines = $this->wrapTextToLines($text, $fontPath, $fontSize, $boxWidth);
-            $lineHeight = (int)($fontSize * 1.25);
-            $startX = $this->computeX($img->width(), $x, $align, null);
+            $lineHeight = (int)($fontSize * 1.4); // زيادة المسافة بين الأسطر للعربية
 
-            // Get additional styling options
+            // الحصول على خيارات التصميم الإضافية
             $strokeSize = $position['stroke']['size'] ?? 0;
             $strokeColor = $position['stroke']['color'] ?? '#ffffff';
             $outlineColor = $position['outline']['color'] ?? '#000000';
             $outlineOpacity = $position['outline']['opacity'] ?? 18;
             $outlineSize = $position['outline']['size'] ?? 13;
-            $outlineRange = $position['outline']['range'] ?? 50;
 
-            Log::info("Drawing text: {$text} at position ({$startX}, {$y}) with {$fontSize}px font");
+            Log::info("Drawing Arabic text: {$text} at position ({$x}, {$y}) with {$fontSize}px font");
 
             foreach ($lines as $i => $line) {
                 $lineY = $y + ($i * $lineHeight);
+                $startX = $this->computeX($img->width(), $x, $align, $this->getTextWidth($line, $fontPath, $fontSize));
 
-                // Draw outline/outer glow effect
+                // رسم التأثير الخارجي (outer glow)
                 if ($outlineSize > 0) {
-                    for ($o = 1; $o <= $outlineSize; $o++) {
-                        $img->text($line, $startX, $lineY, function ($font) use ($fontPath, $fontSize, $outlineColor, $align, $outlineOpacity) {
-                            if ($fontPath && file_exists($fontPath)) {
-                                $font->file($fontPath);
+                    for ($ox = -$outlineSize; $ox <= $outlineSize; $ox++) {
+                        for ($oy = -$outlineSize; $oy <= $outlineSize; $oy++) {
+                            if ($ox != 0 || $oy != 0) {
+                                $img->text($line, $startX + $ox, $lineY + $oy, function ($font) use ($fontPath, $fontSize, $outlineColor, $align, $outlineOpacity) {
+                                    if ($fontPath && file_exists($fontPath)) {
+                                        $font->file($fontPath);
+                                    }
+                                    $font->size($fontSize);
+                                    $font->color($outlineColor);
+                                    $font->align($align);
+                                    $font->valign('top');
+                                });
                             }
-                            $font->size($fontSize);
-                            $font->color($outlineColor);
-                            $font->align($align);
-                            $font->valign('top');
-                            $font->opacity($outlineOpacity);
-                        });
-                    }
-                }
-
-                // Draw stroke effect
-                if ($strokeSize > 0) {
-                    for ($s = 1; $s <= $strokeSize; $s++) {
-                        // Draw stroke in all directions
-                        $offsets = [
-                            [$s, 0], [-$s, 0], [0, $s], [0, -$s],  // horizontal and vertical
-                            [$s, $s], [-$s, -$s], [$s, -$s], [-$s, $s]  // diagonal
-                        ];
-
-                        foreach ($offsets as $offset) {
-                            $img->text($line, $startX + $offset[0], $lineY + $offset[1], function ($font) use ($fontPath, $fontSize, $strokeColor, $align) {
-                                if ($fontPath && file_exists($fontPath)) {
-                                    $font->file($fontPath);
-                                }
-                                $font->size($fontSize);
-                                $font->color($strokeColor);
-                                $font->align($align);
-                                $font->valign('top');
-                            });
                         }
                     }
                 }
 
-                // Draw main text
+                // رسم الحدود (stroke)
+                if ($strokeSize > 0) {
+                    $offsets = [
+                        [$strokeSize, 0], [-$strokeSize, 0], [0, $strokeSize], [0, -$strokeSize],
+                        [$strokeSize, $strokeSize], [-$strokeSize, -$strokeSize], [$strokeSize, -$strokeSize], [-$strokeSize, $strokeSize]
+                    ];
+
+                    foreach ($offsets as $offset) {
+                        $img->text($line, $startX + $offset[0], $lineY + $offset[1], function ($font) use ($fontPath, $fontSize, $strokeColor, $align) {
+                            if ($fontPath && file_exists($fontPath)) {
+                                $font->file($fontPath);
+                            }
+                            $font->size($fontSize);
+                            $font->color($strokeColor);
+                            $font->align($align);
+                            $font->valign('top');
+                        });
+                    }
+                }
+
+                // رسم النص الأساسي
                 $img->text($line, $startX, $lineY, function ($font) use ($fontPath, $fontSize, $hexColor, $align) {
                     if ($fontPath && file_exists($fontPath)) {
                         $font->file($fontPath);
@@ -263,7 +327,7 @@ class CourseImageGenerator
             }
         } catch (\Exception $e) {
             Log::warning("Failed to draw text '{$text}': " . $e->getMessage());
-            // Fallback drawing without effects
+            // رسم احتياطي بدون تأثيرات
             $img->text($text, $x, $y, function ($font) use ($fontSize, $hexColor, $align) {
                 $font->size($fontSize);
                 $font->color($hexColor);
@@ -278,9 +342,10 @@ class CourseImageGenerator
         $text = $this->processArabicText($text);
 
         if (!$fontFile || !file_exists($fontFile)) {
-            $charWidth = $fontSize * 0.6;
-            $maxChars = max(5, (int)($maxWidth / $charWidth));
-            $words = preg_split('/\s+/u', trim($text));
+            // تقدير تقريبي للعرض بدون خط
+            $charWidth = $fontSize * 0.7; // تعديل للنص العربي
+            $maxChars = max(3, (int)($maxWidth / $charWidth));
+            $words = explode(' ', trim($text));
             $lines = [];
             $current = '';
 
@@ -297,33 +362,31 @@ class CourseImageGenerator
             return $lines;
         }
 
-        $words = preg_split('/\s+/u', trim($text));
+        $words = explode(' ', trim($text));
         $lines = [];
         $current = '';
 
         foreach ($words as $word) {
             $try = $current === '' ? $word : $current . ' ' . $word;
-            $box = imagettfbbox($fontSize, 0, $fontFile, $try);
-            $width = abs($box[2] - $box[0]);
+            $width = $this->getTextWidth($try, $fontFile, $fontSize);
 
             if ($width <= $maxWidth) {
                 $current = $try;
             } else {
                 if ($current !== '') $lines[] = $current;
-
-                $wbox = imagettfbbox($fontSize, 0, $fontFile, $word);
-                $wwidth = abs($wbox[2] - $wbox[0]);
-
+                
+                $wwidth = $this->getTextWidth($word, $fontFile, $fontSize);
+                
                 if ($wwidth <= $maxWidth) {
                     $current = $word;
                 } else {
-                    $chars = preg_split('//u', $word, -1, PREG_SPLIT_NO_EMPTY);
+                    // تقسيم الكلمة الطويلة
+                    $chars = mb_str_split($word, 1, 'UTF-8');
                     $piece = '';
 
                     foreach ($chars as $ch) {
                         $tryPiece = $piece . $ch;
-                        $b = imagettfbbox($fontSize, 0, $fontFile, $tryPiece);
-                        $pw = abs($b[2] - $b[0]);
+                        $pw = $this->getTextWidth($tryPiece, $fontFile, $fontSize);
 
                         if ($pw <= $maxWidth) {
                             $piece = $tryPiece;
@@ -341,45 +404,72 @@ class CourseImageGenerator
         return $lines;
     }
 
-    private function processArabicText(string $text): string
+    private function getTextWidth(string $text, ?string $fontFile, int $fontSize): int
     {
-        return trim($text);
+        if (!$fontFile || !file_exists($fontFile) || !function_exists('imagettfbbox')) {
+            // تقدير تقريبي
+            return mb_strlen($text, 'UTF-8') * ($fontSize * 0.7);
+        }
+
+        $box = imagettfbbox($fontSize, 0, $fontFile, $text);
+        return abs($box[2] - $box[0]);
     }
 
-    private function computeX(int $imgWidth, int $x, string $align = 'left', ?int $elementWidth = null): int
+    private function processArabicText(string $text): string
+    {
+        // تنظيف النص وإزالة المسافات الزائدة
+        $text = trim($text);
+        $text = preg_replace('/\s+/', ' ', $text);
+        
+        // إعادة النص كما هو - الخط العربي سيتولى التشكيل الصحيح
+        return $text;
+    }
+
+    private function computeX(int $imgWidth, int $x, string $align = 'right', ?int $textWidth = null): int
     {
         $align = strtolower($align);
 
         if ($align === 'center') {
-            if ($elementWidth) {
-                return (int)(($imgWidth / 2) - ($elementWidth / 2) + $x);
+            if ($textWidth) {
+                return max(0, $x - ($textWidth / 2));
             }
-            return (int)($imgWidth / 2);
+            return $x;
         }
 
-        if ($align === 'right') {
-            if ($elementWidth) {
-                return max(0, $imgWidth - $x - $elementWidth);
-            }
-            return max(0, $imgWidth - $x);
+        if ($align === 'left') {
+            return $x;
         }
 
+        // للمحاذاة اليمينية (افتراضي للعربية)
+        if ($textWidth) {
+            return max(0, $x - $textWidth);
+        }
         return $x;
     }
 
     private function createFallbackImage(array $data): string
     {
-        $img = Image::canvas(800, 600, '#2d3748');
+        $img = Image::canvas(1200, 800, '#2d3748');
         $fontPath = file_exists($this->defaultFont) ? $this->defaultFont : null;
 
-        $title = $data['title'] ?? 'Course';
-        $img->text($title, 400, 200, function ($font) use ($fontPath) {
+        $title = $data['title'] ?? 'كورس';
+        $img->text($title, 600, 300, function ($font) use ($fontPath) {
             if ($fontPath) $font->file($fontPath);
-            $font->size(32);
+            $font->size(48);
             $font->color('#ffffff');
             $font->align('center');
-            $font->valign('top');
+            $font->valign('center');
         });
+
+        if (!empty($data['grade'])) {
+            $img->text($data['grade'], 600, 400, function ($font) use ($fontPath) {
+                if ($fontPath) $font->file($fontPath);
+                $font->size(36);
+                $font->color('#ffffff');
+                $font->align('center');
+                $font->valign('center');
+            });
+        }
 
         return $this->saveImage($img);
     }
