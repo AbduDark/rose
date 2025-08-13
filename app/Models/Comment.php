@@ -12,6 +12,7 @@ class Comment extends Model
     protected $fillable = [
         'user_id',
         'lesson_id',
+        'course_id', // تمت الإضافة
         'content',
         'is_approved',
     ];
@@ -32,8 +33,21 @@ class Comment extends Model
     {
         return $this->belongsTo(Lesson::class);
     }
+
     public function course()
-{
-    return $this->belongsTo(Course::class, 'course_id');
-}
+    {
+        return $this->belongsTo(Course::class, 'course_id');
+    }
+
+    // Scope للتعليقات المعتمدة
+    public function scopeApproved($query)
+    {
+        return $query->where('is_approved', true);
+    }
+
+    // Scope للتعليقات المعلقة
+    public function scopePending($query)
+    {
+        return $query->where('is_approved', false);
+    }
 }

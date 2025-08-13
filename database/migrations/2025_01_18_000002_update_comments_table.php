@@ -13,7 +13,7 @@ return new class extends Migration
             $table->dropForeign(['lesson_id']);
             $table->dropColumn('lesson_id');
         });
-        
+
         Schema::table('comments', function (Blueprint $table) {
             $table->unsignedBigInteger('lesson_id')->after('user_id');
             $table->foreign('lesson_id')->references('id')->on('lessons')->onDelete('cascade');
@@ -26,7 +26,7 @@ return new class extends Migration
             $table->dropForeign(['lesson_id']);
             $table->dropColumn('lesson_id');
         });
-        
+
         Schema::table('comments', function (Blueprint $table) {
             $table->unsignedBigInteger('lesson_id')->after('user_id');
             $table->foreign('lesson_id')->references('id')->on('lessons')->onDelete('cascade');

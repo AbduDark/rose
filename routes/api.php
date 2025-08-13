@@ -11,8 +11,8 @@ use App\Http\Controllers\Api\CommentController;
 use App\Http\Controllers\Api\RatingController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\UserController;
-use App\Http\Controllers\Api\AdminController; // Import AdminController
-use App\Http\Controllers\Api\NotificationController; // Import NotificationController
+use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Middleware\AdminMiddleware;
 
 // Health check endpoint
@@ -29,8 +29,6 @@ Route::get('/health', function () {
     return response()->json(['status' => 'OK', 'timestamp' => now()]);
 });
 
-
-
 // Public Routes
 Route::prefix('auth')->middleware('throttle:10,1')->group(function () {
     Route::post('register',        [AuthController::class, 'register']);
@@ -39,7 +37,7 @@ Route::prefix('auth')->middleware('throttle:10,1')->group(function () {
     Route::get('/verify-email',    [AuthController::class, 'verifyEmail']);
     Route::post('reset-password',  [AuthController::class, 'resetPassword']);
     Route::post('force-logout',    [AuthController::class, 'forceLogout']);
-    Route::post('/resend-pin', [AuthController::class, 'resendPin']);
+    Route::post('/resend-pin',     [AuthController::class, 'resendPin']);
     Route::get('/avatars/{filename}', [UserController::class, 'getAvatar']);
 });
 
@@ -74,27 +72,26 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::put('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
     Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
 
+    // Comments Routes
+    Route::prefix('comments')->group(function () {
+        Route::post('/', [CommentController::class, 'store']);                           // إضافة تعليق
+        Route::get('/my-comments', [CommentController::class, 'getUserComments']);       // تعليقات المستخدم
+        Route::delete('/{id}', [CommentController::class, 'destroy']);                  // حذف تعليق
+    });
 
-    // Comments
-    Route::post('comments', [CommentController::class, 'store']);
+    // Lesson Comments
     Route::get('lessons/{lessonId}/comments', [CommentController::class, 'getLessonComments']);
-    Route::delete('comments/{id}', [CommentController::class, 'destroy']);
 
     // Favorites
     Route::post('favorite/{course_id}',    [FavoriteController::class, 'add']);
     Route::delete('favorite/{course_id}',  [FavoriteController::class, 'remove']);
 
-    // Lessons & Comments
-    Route::get('courses/{id}/lessons',         [LessonController::class, 'index']);
-    // Route::post('comments',                    [CommentController::class, 'store']); // Already defined above
-    // Route::get('lessons/{lesson_id}/comments', [CommentController::class, 'index']); // Already defined above
+    // Lessons
+    Route::get('courses/{id}/lessons',     [LessonController::class, 'index']);
+    Route::get('lessons/{id}',             [LessonController::class, 'show']);
 
     // Ratings
-    Route::post('ratings',                     [RatingController::class, 'store']);
-
-    // Payments
-
-
+    Route::post('ratings',                 [RatingController::class, 'store']);
 });
 
 // Admin Routes (Protected)
@@ -104,7 +101,7 @@ Route::middleware(['auth:sanctum', AdminMiddleware::class])->prefix('admin')->gr
     Route::apiResource('lessons', LessonController::class)->except(['index', 'show']);
 
     // إدارة المستخدمين
-    Route::controller(App\Http\Controllers\Api\AdminController::class)->group(function () {
+    Route::controller(AdminController::class)->group(function () {
         Route::get('users', 'getUsers');
         Route::get('users/{id}', 'getUserDetails');
         Route::put('users/{id}', 'updateUser');
@@ -118,18 +115,20 @@ Route::middleware(['auth:sanctum', AdminMiddleware::class])->prefix('admin')->gr
         Route::get('subscriptions/pending', 'getPendingSubscriptions');
         Route::post('subscriptions/{id}/approve', 'approveSubscription');
         Route::post('subscriptions/{id}/reject', 'rejectSubscription');
+    });
 
-        // إدارة التعليقات
-        Route::get('comments/pending', 'getPendingComments');
-        Route::post('comments/{id}/approve', 'approveComment');
+    // إدارة التعليقات (Admin)
+    Route::prefix('comments')->group(function () {
+        Route::get('/pending', [CommentController::class, 'getPendingComments']);        // التعليقات المعلقة
+        Route::post('/{id}/approve', [CommentController::class, 'approveComment']);      // الموافقة على تعليق
     });
 
     // Admin subscription management
-    Route::get('/admin/subscriptions', [SubscriptionController::class, 'adminIndex']);
-    Route::put('/admin/subscriptions/{id}/approve', [SubscriptionController::class, 'approve']);
-    Route::put('/admin/subscriptions/{id}/reject', [SubscriptionController::class, 'reject']);
+    Route::get('/subscriptions', [SubscriptionController::class, 'adminIndex']);
+    Route::put('/subscriptions/{id}/approve', [SubscriptionController::class, 'approve']);
+    Route::put('/subscriptions/{id}/reject', [SubscriptionController::class, 'reject']);
 
     // Admin notification management
-    Route::post('/admin/notifications/send', [NotificationController::class, 'sendNotification']);
-    Route::get('/admin/notifications/statistics', [NotificationController::class, 'statistics']);
+    Route::post('/notifications/send', [NotificationController::class, 'sendNotification']);
+    Route::get('/notifications/statistics', [NotificationController::class, 'statistics']);
 });
