@@ -12,17 +12,9 @@ class Comment extends Model
     protected $fillable = [
         'user_id',
         'lesson_id',
-        'course_id', // تمت الإضافة
+        'course_id',
         'content',
-        'is_approved',
     ];
-
-    protected function casts(): array
-    {
-        return [
-            'is_approved' => 'boolean',
-        ];
-    }
 
     public function user()
     {
@@ -37,17 +29,5 @@ class Comment extends Model
     public function course()
     {
         return $this->belongsTo(Course::class, 'course_id');
-    }
-
-    // Scope للتعليقات المعتمدة
-    public function scopeApproved($query)
-    {
-        return $query->where('is_approved', true);
-    }
-
-    // Scope للتعليقات المعلقة
-    public function scopePending($query)
-    {
-        return $query->where('is_approved', false);
     }
 }

@@ -80,18 +80,16 @@ class CommentController extends Controller
                 'lesson_id' => $lesson->id,
                 'course_id' => $lesson->course_id,
                 'content' => trim($request->content),
-                'is_approved' => $user->Role === 'admin'
             ]);
 
             $comment->load(['user:id,name,email', 'lesson:id,title', 'course:id,title']);
 
-            $message = $user->Role === 'admin'
-                ? ['ar' => 'تم إضافة التعليق بنجاح', 'en' => 'Comment added successfully']
-                : ['ar' => 'تم إضافة التعليق وسيظهر بعد الموافقة عليه', 'en' => 'Comment added and will appear after approval'];
-
             return $this->successResponse([
                 'comment' => $comment
-            ], $message, 201);
+            ], [
+                'ar' => 'تم إضافة التعليق بنجاح',
+                'en' => 'Comment added successfully'
+            ], 201);
 
         } catch (ModelNotFoundException $e) {
             return $this->errorResponse([
@@ -158,16 +156,11 @@ class CommentController extends Controller
                 ], 403);
             }
 
-            // جلب التعليقات المعتمدة فقط (إلا للأدمن)
-            $query = Comment::where('lesson_id', $lessonId)
+            // جلب جميع التعليقات
+            $comments = Comment::where('lesson_id', $lessonId)
                 ->with(['user:id,name,email', 'lesson:id,title', 'course:id,title'])
-                ->latest();
-
-            if ($user->Role !== 'admin') {
-                $query->where('is_approved', true);
-            }
-
-            $comments = $query->get();
+                ->latest()
+                ->get();
 
             return $this->successResponse([
                 'comments' => $comments,
@@ -193,57 +186,6 @@ class CommentController extends Controller
     }
 
     /**
-     * الموافقة على تعليق (للأدمن فقط)
-     */
-    public function approveComment($id)
-    {
-        try {
-            /** @var User $user */
-            $user = Auth::user();
-
-            // التحقق من صلاحيات الأدمن
-            if (!$user || $user->Role !== 'admin') {
-                return $this->errorResponse([
-                    'ar' => 'غير مصرح لك بالموافقة على التعليقات',
-                    'en' => 'You are not authorized to approve comments'
-                ], 403);
-            }
-
-            $comment = Comment::with(['user:id,name,email', 'lesson:id,title', 'course:id,title'])
-                ->findOrFail($id);
-
-            if ($comment->is_approved) {
-                return $this->errorResponse([
-                    'ar' => 'التعليق معتمد بالفعل',
-                    'en' => 'Comment is already approved'
-                ], 400);
-            }
-
-            $comment->update(['is_approved' => true]);
-
-            return $this->successResponse([
-                'comment' => $comment->fresh(['user:id,name,email', 'lesson:id,title', 'course:id,title'])
-            ], [
-                'ar' => 'تم الموافقة على التعليق بنجاح',
-                'en' => 'Comment approved successfully'
-            ]);
-
-        } catch (ModelNotFoundException $e) {
-            return $this->errorResponse([
-                'ar' => 'التعليق المطلوب غير موجود',
-                'en' => 'The requested comment does not exist'
-            ], 404);
-        } catch (\Exception $e) {
-            Log::error('Approve comment error: ' . $e->getMessage(), [
-                'comment_id' => $id,
-                'user_id' => Auth::id(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            return $this->serverErrorResponse();
-        }
-    }
-
-    /**
      * حذف تعليق
      */
     public function destroy($id)
@@ -254,28 +196,21 @@ class CommentController extends Controller
             $user = Auth::user();
 
             // صلاحيات الحذف:
-            // 1. صاحب التعليق يمكنه حذف تعليقه إذا لم يكن معتمد بعد
+            // 1. صاحب التعليق يمكنه حذف تعليقه
             // 2. الأدمن يمكنه حذف أي تعليق
             $canDelete = false;
 
             if ($user->Role === 'admin') {
                 $canDelete = true;
-            } elseif ($comment->user_id === $user->id && !$comment->is_approved) {
+            } elseif ($comment->user_id === $user->id) {
                 $canDelete = true;
             }
 
             if (!$canDelete) {
-                if ($comment->user_id === $user->id && $comment->is_approved) {
-                    return $this->errorResponse([
-                        'ar' => 'لا يمكن حذف تعليق معتمد إلا بواسطة المدير',
-                        'en' => 'Only admin can delete approved comments'
-                    ], 403);
-                } else {
-                    return $this->errorResponse([
-                        'ar' => 'غير مصرح لك بحذف هذا التعليق',
-                        'en' => 'You are not authorized to delete this comment'
-                    ], 403);
-                }
+                return $this->errorResponse([
+                    'ar' => 'غير مصرح لك بحذف هذا التعليق',
+                    'en' => 'You are not authorized to delete this comment'
+                ], 403);
             }
 
             $comment->delete();
@@ -301,44 +236,6 @@ class CommentController extends Controller
     }
 
     /**
-     * جلب التعليقات المعلقة للأدمن
-     */
-    public function getPendingComments()
-    {
-        try {
-            /** @var User $user */
-            $user = Auth::user();
-
-            if (!$user || $user->Role !== 'admin') {
-                return $this->errorResponse([
-                    'ar' => 'غير مصرح لك بعرض التعليقات المعلقة',
-                    'en' => 'You are not authorized to view pending comments'
-                ], 403);
-            }
-
-            $pendingComments = Comment::where('is_approved', false)
-                ->with(['user:id,name,email', 'lesson:id,title', 'course:id,title'])
-                ->latest()
-                ->get();
-
-            return $this->successResponse([
-                'comments' => $pendingComments,
-                'total' => $pendingComments->count()
-            ], [
-                'ar' => 'تم جلب التعليقات المعلقة بنجاح',
-                'en' => 'Pending comments retrieved successfully'
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Get pending comments error: ' . $e->getMessage(), [
-                'user_id' => Auth::id(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            return $this->serverErrorResponse();
-        }
-    }
-
-    /**
      * جلب جميع تعليقات المستخدم
      */
     public function getUserComments()
@@ -354,9 +251,7 @@ class CommentController extends Controller
 
             return $this->successResponse([
                 'comments' => $comments,
-                'total' => $comments->count(),
-                'approved' => $comments->where('is_approved', true)->count(),
-                'pending' => $comments->where('is_approved', false)->count()
+                'total' => $comments->count()
             ], [
                 'ar' => 'تم جلب تعليقاتك بنجاح',
                 'en' => 'Your comments retrieved successfully'

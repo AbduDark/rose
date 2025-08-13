@@ -73,11 +73,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
 
     // Comments Routes
-    Route::prefix('comments')->group(function () {
-        Route::post('/', [CommentController::class, 'store']);                           // إضافة تعليق
-        Route::get('/my-comments', [CommentController::class, 'getUserComments']);       // تعليقات المستخدم
-        Route::delete('/{id}', [CommentController::class, 'destroy']);                  // حذف تعليق
-    });
+    Route::post('/comments', [CommentController::class, 'store']);                           // إضافة تعليق
+    Route::get('/my-comments', [CommentController::class, 'getUserComments']);       // تعليقات المستخدم
+    Route::delete('/comments/{id}', [CommentController::class, 'destroy']);                  // حذف تعليق
+
 
     // Lesson Comments
     Route::get('lessons/{lessonId}/comments', [CommentController::class, 'getLessonComments']);
