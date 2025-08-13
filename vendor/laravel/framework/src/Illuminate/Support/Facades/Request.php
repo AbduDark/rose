@@ -151,7 +151,7 @@ namespace Illuminate\Support\Facades;
  * @method static string|array|null cookie(string|null $key = null, string|array|null $default = null)
  * @method static array allFiles()
  * @method static bool hasFile(string $key)
- * @method static array|\Illuminate\Http\UploadedFile|\Illuminate\Http\UploadedFile[]|null file(string|null $key = null, mixed $default = null)
+ * @method static \Illuminate\Http\UploadedFile|\Illuminate\Http\UploadedFile[]|array|null file(string|null $key = null, mixed $default = null)
  * @method static \Illuminate\Http\Request dump(mixed $keys = [])
  * @method static never dd(mixed ...$args)
  * @method static bool exists(string|array $key)
@@ -169,8 +169,8 @@ namespace Illuminate\Support\Facades;
  * @method static bool boolean(string|null $key = null, bool $default = false)
  * @method static int integer(string $key, int $default = 0)
  * @method static float float(string $key, float $default = 0)
- * @method static \Illuminate\Support\Carbon|null date(string $key, string|null $format = null, \UnitEnum|string|null $tz = null)
- * @method static \BackedEnum|null enum(string $key, string $enumClass, \BackedEnum|null $default = null)
+ * @method static \Illuminate\Support\Carbon|null date(string $key, string|null $format = null, string|null $tz = null)
+ * @method static \BackedEnum|null enum(string $key, string $enumClass)
  * @method static \BackedEnum[] enums(string $key, string $enumClass)
  * @method static array array(array|string|null $key = null)
  * @method static \Illuminate\Support\Collection collect(array|string|null $key = null)
@@ -185,9 +185,6 @@ namespace Illuminate\Support\Facades;
  * @method static array validate(array $rules, ...$params)
  * @method static array validateWithBag(string $errorBag, array $rules, ...$params)
  * @method static bool hasValidSignature(bool $absolute = true)
- * @method static bool hasValidRelativeSignature()
- * @method static bool hasValidSignatureWhileIgnoring($ignoreQuery = [], $absolute = true)
- * @method static bool hasValidRelativeSignatureWhileIgnoring($ignoreQuery = [])
  *
  * @see \Illuminate\Http\Request
  */

@@ -65,6 +65,7 @@ class Application extends SymfonyApplication implements ApplicationContract
      * @param  \Illuminate\Contracts\Container\Container  $laravel
      * @param  \Illuminate\Contracts\Events\Dispatcher  $events
      * @param  string  $version
+     * @return void
      */
     public function __construct(Container $laravel, Dispatcher $events, $version)
     {
@@ -201,8 +202,8 @@ class Application extends SymfonyApplication implements ApplicationContract
     public function output()
     {
         return $this->lastOutput && method_exists($this->lastOutput, 'fetch')
-            ? $this->lastOutput->fetch()
-            : '';
+                        ? $this->lastOutput->fetch()
+                        : '';
     }
 
     /**

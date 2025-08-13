@@ -4,6 +4,7 @@ namespace Illuminate\Foundation\Testing\Concerns;
 
 use Illuminate\Contracts\Support\Jsonable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -222,7 +223,8 @@ trait InteractsWithDatabase
      */
     protected function isSoftDeletableModel($model)
     {
-        return $model instanceof Model && $model::isSoftDeletable();
+        return $model instanceof Model
+            && in_array(SoftDeletes::class, class_uses_recursive($model));
     }
 
     /**

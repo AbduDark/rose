@@ -3,15 +3,11 @@
 namespace Illuminate\Support;
 
 use ArrayAccess;
-use ArrayIterator;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Contracts\Support\Jsonable;
-use Illuminate\Support\Traits\Conditionable;
 use Illuminate\Support\Traits\InteractsWithData;
 use Illuminate\Support\Traits\Macroable;
-use IteratorAggregate;
 use JsonSerializable;
-use Traversable;
 
 /**
  * @template TKey of array-key
@@ -20,9 +16,9 @@ use Traversable;
  * @implements \Illuminate\Contracts\Support\Arrayable<TKey, TValue>
  * @implements \ArrayAccess<TKey, TValue>
  */
-class Fluent implements Arrayable, ArrayAccess, IteratorAggregate, Jsonable, JsonSerializable
+class Fluent implements Arrayable, ArrayAccess, Jsonable, JsonSerializable
 {
-    use Conditionable, InteractsWithData, Macroable {
+    use InteractsWithData, Macroable {
         __call as macroCall;
     }
 
@@ -37,21 +33,11 @@ class Fluent implements Arrayable, ArrayAccess, IteratorAggregate, Jsonable, Jso
      * Create a new fluent instance.
      *
      * @param  iterable<TKey, TValue>  $attributes
+     * @return void
      */
     public function __construct($attributes = [])
     {
         $this->fill($attributes);
-    }
-
-    /**
-     * Create a new fluent instance.
-     *
-     * @param  iterable<TKey, TValue>  $attributes
-     * @return static
-     */
-    public static function make($attributes = [])
-    {
-        return new static($attributes);
     }
 
     /**
@@ -204,26 +190,6 @@ class Fluent implements Arrayable, ArrayAccess, IteratorAggregate, Jsonable, Jso
     }
 
     /**
-     * Determine if the fluent instance is empty.
-     *
-     * @return bool
-     */
-    public function isEmpty(): bool
-    {
-        return empty($this->attributes);
-    }
-
-    /**
-     * Determine if the fluent instance is not empty.
-     *
-     * @return bool
-     */
-    public function isNotEmpty(): bool
-    {
-        return ! $this->isEmpty();
-    }
-
-    /**
      * Determine if the given offset exists.
      *
      * @param  TKey  $offset
@@ -266,16 +232,6 @@ class Fluent implements Arrayable, ArrayAccess, IteratorAggregate, Jsonable, Jso
     public function offsetUnset($offset): void
     {
         unset($this->attributes[$offset]);
-    }
-
-    /**
-     * Get an iterator for the attributes.
-     *
-     * @return ArrayIterator<TKey, TValue>
-     */
-    public function getIterator(): Traversable
-    {
-        return new ArrayIterator($this->attributes);
     }
 
     /**

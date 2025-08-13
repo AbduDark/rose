@@ -92,12 +92,12 @@ class ApplicationBuilder
     /**
      * Register the core event service provider for the application.
      *
-     * @param  iterable<int, string>|bool  $discover
+     * @param  array|bool  $discover
      * @return $this
      */
-    public function withEvents(iterable|bool $discover = true)
+    public function withEvents(array|bool $discover = [])
     {
-        if (is_iterable($discover)) {
+        if (is_array($discover) && count($discover) > 0) {
             AppEventServiceProvider::setEventDiscoveryPaths($discover);
         }
 

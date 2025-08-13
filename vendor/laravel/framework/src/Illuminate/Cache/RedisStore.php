@@ -51,6 +51,7 @@ class RedisStore extends TaggableStore implements LockProvider
      * @param  \Illuminate\Contracts\Redis\Factory  $redis
      * @param  string  $prefix
      * @param  string  $connection
+     * @return void
      */
     public function __construct(Redis $redis, $prefix = '', $connection = 'default')
     {
@@ -140,7 +141,7 @@ class RedisStore extends TaggableStore implements LockProvider
         $serializedValues = [];
 
         foreach ($values as $key => $value) {
-            $serializedValues[$this->prefix.$key] = $this->connectionAwareSerialize($value, $connection);
+            $serializedValues[$this->prefix.$key] = $this->serialize($value);
         }
 
         $connection->multi();

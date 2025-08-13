@@ -16,7 +16,6 @@ use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Queue\Events\JobReleasedAfterException;
 use Illuminate\Queue\Events\JobTimedOut;
 use Illuminate\Queue\Events\Looping;
-use Illuminate\Queue\Events\WorkerStarting;
 use Illuminate\Queue\Events\WorkerStopping;
 use Illuminate\Support\Carbon;
 use Throwable;
@@ -107,6 +106,7 @@ class Worker
      * @param  \Illuminate\Contracts\Debug\ExceptionHandler  $exceptions
      * @param  callable  $isDownForMaintenance
      * @param  callable|null  $resetScope
+     * @return void
      */
     public function __construct(
         QueueManager $manager,
@@ -139,8 +139,6 @@ class Worker
         $lastRestart = $this->getTimestampOfLastQueueRestart();
 
         [$startTime, $jobsProcessed] = [hrtime(true) / 1e9, 0];
-
-        $this->raiseWorkerStartingEvent($connectionName, $queue, $options);
 
         while (true) {
             // Before reserving any jobs, we will make sure this queue is not paused and
@@ -619,28 +617,15 @@ class Worker
         $backoff = explode(
             ',',
             method_exists($job, 'backoff') && ! is_null($job->backoff())
-                ? $job->backoff()
-                : $options->backoff
+                        ? $job->backoff()
+                        : $options->backoff
         );
 
         return (int) ($backoff[$job->attempts() - 1] ?? last($backoff));
     }
 
     /**
-     * Raise an event indicating the worker is starting.
-     *
-     * @param  string  $connectionName
-     * @param  string  $queue
-     * @param  \Illuminate\Queue\WorkerOptions  $options
-     * @return void
-     */
-    protected function raiseWorkerStartingEvent($connectionName, $queue, $options)
-    {
-        $this->events->dispatch(new WorkerStarting($connectionName, $queue, $options));
-    }
-
-    /**
-     * Raise an event indicating a job is being popped from the queue.
+     * Raise the before job has been popped.
      *
      * @param  string  $connectionName
      * @return void
@@ -651,7 +636,7 @@ class Worker
     }
 
     /**
-     * Raise an event indicating a job has been popped from the queue.
+     * Raise the after job has been popped.
      *
      * @param  string  $connectionName
      * @param  \Illuminate\Contracts\Queue\Job|null  $job
@@ -665,7 +650,7 @@ class Worker
     }
 
     /**
-     * Raise an event indicating a job is being processed.
+     * Raise the before queue job event.
      *
      * @param  string  $connectionName
      * @param  \Illuminate\Contracts\Queue\Job  $job
@@ -679,7 +664,7 @@ class Worker
     }
 
     /**
-     * Raise an event indicating a job has been processed.
+     * Raise the after queue job event.
      *
      * @param  string  $connectionName
      * @param  \Illuminate\Contracts\Queue\Job  $job
@@ -763,7 +748,7 @@ class Worker
      */
     public function memoryExceeded($memoryLimit)
     {
-        return $memoryLimit > 0 && (memory_get_usage(true) / 1024 / 1024) >= $memoryLimit;
+        return (memory_get_usage(true) / 1024 / 1024) >= $memoryLimit;
     }
 
     /**

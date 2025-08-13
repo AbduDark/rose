@@ -134,6 +134,7 @@ class SessionGuard implements StatefulGuard, SupportsBasicAuth
      * @param  \Illuminate\Support\Timebox|null  $timebox
      * @param  bool  $rehashOnLogin
      * @param  int  $timeboxDuration
+     * @return void
      */
     public function __construct(
         $name,
@@ -248,8 +249,8 @@ class SessionGuard implements StatefulGuard, SupportsBasicAuth
         }
 
         return $this->user()
-            ? $this->user()->getAuthIdentifier()
-            : $this->session->get($this->getName());
+                    ? $this->user()->getAuthIdentifier()
+                    : $this->session->get($this->getName());
     }
 
     /**

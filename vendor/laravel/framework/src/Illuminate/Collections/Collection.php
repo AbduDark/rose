@@ -7,7 +7,6 @@ use ArrayIterator;
 use Illuminate\Contracts\Support\CanBeEscapedWhenCastToString;
 use Illuminate\Support\Traits\EnumeratesValues;
 use Illuminate\Support\Traits\Macroable;
-use Illuminate\Support\Traits\TransformsToResourceCollection;
 use InvalidArgumentException;
 use stdClass;
 use Traversable;
@@ -25,7 +24,7 @@ class Collection implements ArrayAccess, CanBeEscapedWhenCastToString, Enumerabl
     /**
      * @use \Illuminate\Support\Traits\EnumeratesValues<TKey, TValue>
      */
-    use EnumeratesValues, Macroable, TransformsToResourceCollection;
+    use EnumeratesValues, Macroable;
 
     /**
      * The items contained in the collection.
@@ -38,6 +37,7 @@ class Collection implements ArrayAccess, CanBeEscapedWhenCastToString, Enumerabl
      * Create a new collection.
      *
      * @param  \Illuminate\Contracts\Support\Arrayable<TKey, TValue>|iterable<TKey, TValue>|null  $items
+     * @return void
      */
     public function __construct($items = [])
     {
@@ -49,12 +49,11 @@ class Collection implements ArrayAccess, CanBeEscapedWhenCastToString, Enumerabl
      *
      * @param  int  $from
      * @param  int  $to
-     * @param  int  $step
      * @return static<int, int>
      */
-    public static function range($from, $to, $step = 1)
+    public static function range($from, $to)
     {
-        return new static(range($from, $to, $step));
+        return new static(range($from, $to));
     }
 
     /**
@@ -86,7 +85,7 @@ class Collection implements ArrayAccess, CanBeEscapedWhenCastToString, Enumerabl
     public function median($key = null)
     {
         $values = (isset($key) ? $this->pluck($key) : $this)
-            ->reject(fn ($item) => is_null($item))
+            ->filter(fn ($item) => ! is_null($item))
             ->sort()->values();
 
         $count = $values->count();
@@ -165,10 +164,6 @@ class Collection implements ArrayAccess, CanBeEscapedWhenCastToString, Enumerabl
             $results[$key] = $values;
         }
 
-        if (! $results) {
-            return new static;
-        }
-
         return new static(array_replace(...$results));
     }
 
@@ -240,7 +235,7 @@ class Collection implements ArrayAccess, CanBeEscapedWhenCastToString, Enumerabl
     public function crossJoin(...$lists)
     {
         return new static(Arr::crossJoin(
-            $this->items, ...array_map($this->getArrayableItems(...), $lists)
+            $this->items, ...array_map([$this, 'getArrayableItems'], $lists)
         ));
     }
 
@@ -716,17 +711,12 @@ class Collection implements ArrayAccess, CanBeEscapedWhenCastToString, Enumerabl
     }
 
     /**
-     * Determine if the collection contains exactly one item. If a callback is provided, determine if exactly one item matches the condition.
+     * Determine if the collection contains a single item.
      *
-     * @param  (callable(TValue, TKey): bool)|null  $callback
      * @return bool
      */
-    public function containsOneItem(?callable $callback = null): bool
+    public function containsOneItem()
     {
-        if ($callback) {
-            return $this->filter($callback)->count() === 1;
-        }
-
         return $this->count() === 1;
     }
 
@@ -1236,7 +1226,7 @@ class Collection implements ArrayAccess, CanBeEscapedWhenCastToString, Enumerabl
     /**
      * Get and remove the first N items from the collection.
      *
-     * @param  int<0, max>  $count
+     * @param  int  $count
      * @return static<int, TValue>|TValue|null
      *
      * @throws \InvalidArgumentException
@@ -1450,10 +1440,9 @@ class Collection implements ArrayAccess, CanBeEscapedWhenCastToString, Enumerabl
      * Chunk the collection into chunks of the given size.
      *
      * @param  int  $size
-     * @param  bool  $preserveKeys
-     * @return ($preserveKeys is true ? static<int, static> : static<int, static<int, TValue>>)
+     * @return static<int, static>
      */
-    public function chunk($size, $preserveKeys = true)
+    public function chunk($size)
     {
         if ($size <= 0) {
             return new static;
@@ -1461,7 +1450,7 @@ class Collection implements ArrayAccess, CanBeEscapedWhenCastToString, Enumerabl
 
         $chunks = [];
 
-        foreach (array_chunk($this->items, $size, $preserveKeys) as $chunk) {
+        foreach (array_chunk($this->items, $size, true) as $chunk) {
             $chunks[] = new static($chunk);
         }
 
@@ -1471,8 +1460,8 @@ class Collection implements ArrayAccess, CanBeEscapedWhenCastToString, Enumerabl
     /**
      * Chunk the collection into chunks with a callback.
      *
-     * @param  callable(TValue, TKey, static<TKey, TValue>): bool  $callback
-     * @return static<int, static<TKey, TValue>>
+     * @param  callable(TValue, TKey, static<int, TValue>): bool  $callback
+     * @return static<int, static<int, TValue>>
      */
     public function chunkWhile(callable $callback)
     {
@@ -1729,12 +1718,8 @@ class Collection implements ArrayAccess, CanBeEscapedWhenCastToString, Enumerabl
     /**
      * Transform each item in the collection using a callback.
      *
-     * @template TMapValue
-     *
-     * @param  callable(TValue, TKey): TMapValue  $callback
+     * @param  callable(TValue, TKey): TValue  $callback
      * @return $this
-     *
-     * @phpstan-this-out static<TKey, TMapValue>
      */
     public function transform(callable $callback)
     {
@@ -1846,7 +1831,7 @@ class Collection implements ArrayAccess, CanBeEscapedWhenCastToString, Enumerabl
     /**
      * Count the number of items in the collection.
      *
-     * @return int<0, max>
+     * @return int
      */
     public function count(): int
     {

@@ -76,8 +76,8 @@ trait GuardsAttributes
     public function getGuarded()
     {
         return $this->guarded === false
-            ? []
-            : $this->guarded;
+                    ? []
+                    : $this->guarded;
     }
 
     /**
@@ -140,10 +140,8 @@ trait GuardsAttributes
     /**
      * Run the given callable while being unguarded.
      *
-     * @template TReturn
-     *
-     * @param  callable(): TReturn  $callback
-     * @return TReturn
+     * @param  callable  $callback
+     * @return mixed
      */
     public static function unguarded(callable $callback)
     {
@@ -248,8 +246,8 @@ trait GuardsAttributes
     /**
      * Get the fillable attributes of a given array.
      *
-     * @param  array<string, mixed>  $attributes
-     * @return array<string, mixed>
+     * @param  array  $attributes
+     * @return array
      */
     protected function fillableFromArray(array $attributes)
     {

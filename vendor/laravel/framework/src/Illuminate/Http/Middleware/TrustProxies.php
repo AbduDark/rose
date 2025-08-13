@@ -68,7 +68,10 @@ class TrustProxies
     {
         $trustedIps = $this->proxies() ?: config('trustedproxy.proxies');
 
-        if (is_null($trustedIps) && laravel_cloud()) {
+        if (is_null($trustedIps) &&
+            (laravel_cloud() ||
+             str_ends_with($request->host(), '.on-forge.com') ||
+             str_ends_with($request->host(), '.on-vapor.com'))) {
             $trustedIps = '*';
         }
 
@@ -77,8 +80,8 @@ class TrustProxies
         }
 
         $trustedIps = is_string($trustedIps)
-            ? array_map(trim(...), explode(',', $trustedIps))
-            : $trustedIps;
+                ? array_map('trim', explode(',', $trustedIps))
+                : $trustedIps;
 
         if (is_array($trustedIps)) {
             return $this->setTrustedProxyIpAddressesToSpecificIps($request, $trustedIps);

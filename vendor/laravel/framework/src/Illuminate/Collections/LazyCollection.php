@@ -39,6 +39,7 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
      * Create a new lazy collection instance.
      *
      * @param  \Illuminate\Contracts\Support\Arrayable<TKey, TValue>|iterable<TKey, TValue>|(Closure(): \Generator<TKey, TValue, mixed, void>)|self<TKey, TValue>|array<TKey, TValue>|null  $source
+     * @return void
      */
     public function __construct($source = null)
     {
@@ -74,22 +75,17 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
      *
      * @param  int  $from
      * @param  int  $to
-     * @param  int  $step
      * @return static<int, int>
      */
-    public static function range($from, $to, $step = 1)
+    public static function range($from, $to)
     {
-        if ($step == 0) {
-            throw new InvalidArgumentException('Step value cannot be zero.');
-        }
-
-        return new static(function () use ($from, $to, $step) {
+        return new static(function () use ($from, $to) {
             if ($from <= $to) {
-                for (; $from <= $to; $from += abs($step)) {
+                for (; $from <= $to; $from++) {
                     yield $from;
                 }
             } else {
-                for (; $from >= $to; $from -= abs($step)) {
+                for (; $from >= $to; $from--) {
                     yield $from;
                 }
             }
@@ -113,7 +109,7 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
     /**
      * Eager load all items into a new lazy collection backed by an array.
      *
-     * @return static<TKey, TValue>
+     * @return static
      */
     public function eager()
     {
@@ -123,7 +119,7 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
     /**
      * Cache values as they're enumerated.
      *
-     * @return static<TKey, TValue>
+     * @return static
      */
     public function remember()
     {
@@ -334,7 +330,7 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
      * Get the items that are not present in the given items.
      *
      * @param  \Illuminate\Contracts\Support\Arrayable<array-key, TValue>|iterable<array-key, TValue>  $items
-     * @return static<TKey, TValue>
+     * @return static
      */
     public function diff($items)
     {
@@ -777,16 +773,12 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
             [$value, $key] = $this->explodePluckParameters($value, $key);
 
             foreach ($this as $item) {
-                $itemValue = $value instanceof Closure
-                    ? $value($item)
-                    : data_get($item, $value);
+                $itemValue = data_get($item, $value);
 
                 if (is_null($key)) {
                     yield $itemValue;
                 } else {
-                    $itemKey = $key instanceof Closure
-                        ? $key($item)
-                        : data_get($item, $key);
+                    $itemKey = data_get($item, $key);
 
                     if (is_object($itemKey) && method_exists($itemKey, '__toString')) {
                         $itemKey = (string) $itemKey;
@@ -1095,7 +1087,7 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
     /**
      * Reverse items order.
      *
-     * @return static<TKey, TValue>
+     * @return static
      */
     public function reverse()
     {
@@ -1190,7 +1182,7 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
     /**
      * Shuffle the items in the collection.
      *
-     * @return static<TKey, TValue>
+     * @return static
      */
     public function shuffle()
     {
@@ -1379,28 +1371,22 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
      * Chunk the collection into chunks of the given size.
      *
      * @param  int  $size
-     * @param  bool  $preserveKeys
-     * @return ($preserveKeys is true ? static<int, static> : static<int, static<int, TValue>>)
+     * @return static<int, static>
      */
-    public function chunk($size, $preserveKeys = true)
+    public function chunk($size)
     {
         if ($size <= 0) {
             return static::empty();
         }
 
-        $add = match ($preserveKeys) {
-            true => fn (array &$chunk, Traversable $iterator) => $chunk[$iterator->key()] = $iterator->current(),
-            false => fn (array &$chunk, Traversable $iterator) => $chunk[] = $iterator->current(),
-        };
-
-        return new static(function () use ($size, $add) {
+        return new static(function () use ($size) {
             $iterator = $this->getIterator();
 
             while ($iterator->valid()) {
                 $chunk = [];
 
                 while (true) {
-                    $add($chunk, $iterator);
+                    $chunk[$iterator->key()] = $iterator->current();
 
                     if (count($chunk) < $size) {
                         $iterator->next();
@@ -1435,7 +1421,7 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
      * Chunk the collection into chunks with a callback.
      *
      * @param  callable(TValue, TKey, Collection<TKey, TValue>): bool  $callback
-     * @return static<int, static<TKey, TValue>>
+     * @return static<int, static<int, TValue>>
      */
     public function chunkWhile(callable $callback)
     {
@@ -1553,7 +1539,7 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
      * Take the first or last {$limit} items.
      *
      * @param  int  $limit
-     * @return static<TKey, TValue>
+     * @return static
      */
     public function take($limit)
     {
@@ -1596,7 +1582,7 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
      * Take items in the collection until the given condition is met.
      *
      * @param  TValue|callable(TValue,TKey): bool  $value
-     * @return static<TKey, TValue>
+     * @return static
      */
     public function takeUntil($value)
     {
@@ -1618,7 +1604,7 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
      * Take items in the collection until a given point in time.
      *
      * @param  \DateTimeInterface  $timeout
-     * @return static<TKey, TValue>
+     * @return static
      */
     public function takeUntilTimeout(DateTimeInterface $timeout)
     {
@@ -1643,7 +1629,7 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
      * Take items in the collection while the given condition is met.
      *
      * @param  TValue|callable(TValue,TKey): bool  $value
-     * @return static<TKey, TValue>
+     * @return static
      */
     public function takeWhile($value)
     {
@@ -1657,7 +1643,7 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
      * Pass each item in the collection to the given callback, lazily.
      *
      * @param  callable(TValue, TKey): mixed  $callback
-     * @return static<TKey, TValue>
+     * @return static
      */
     public function tapEach(callable $callback)
     {
@@ -1717,7 +1703,7 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
      *
      * @param  (callable(TValue, TKey): mixed)|string|null  $key
      * @param  bool  $strict
-     * @return static<TKey, TValue>
+     * @return static
      */
     public function unique($key = null, $strict = false)
     {
@@ -1766,9 +1752,9 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
         $iterables = func_get_args();
 
         return new static(function () use ($iterables) {
-            $iterators = (new Collection($iterables))
-                ->map(fn ($iterable) => $this->makeIterator($iterable))
-                ->prepend($this->getIterator());
+            $iterators = (new Collection($iterables))->map(function ($iterable) {
+                return $this->makeIterator($iterable);
+            })->prepend($this->getIterator());
 
             while ($iterators->contains->valid()) {
                 yield new static($iterators->map->current());
@@ -1873,7 +1859,7 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
     {
         $value = is_string($value) ? explode('.', $value) : $value;
 
-        $key = is_null($key) || is_array($key) || $key instanceof Closure ? $key : explode('.', $key);
+        $key = is_null($key) || is_array($key) ? $key : explode('.', $key);
 
         return [$value, $key];
     }

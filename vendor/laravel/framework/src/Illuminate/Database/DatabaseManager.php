@@ -13,8 +13,6 @@ use InvalidArgumentException;
 use PDO;
 use RuntimeException;
 
-use function Illuminate\Support\enum_value;
-
 /**
  * @mixin \Illuminate\Database\Connection
  */
@@ -71,6 +69,7 @@ class DatabaseManager implements ConnectionResolverInterface
      *
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @param  \Illuminate\Database\Connectors\ConnectionFactory  $factory
+     * @return void
      */
     public function __construct($app, ConnectionFactory $factory)
     {
@@ -87,12 +86,12 @@ class DatabaseManager implements ConnectionResolverInterface
     /**
      * Get a database connection instance.
      *
-     * @param  \UnitEnum|string|null  $name
+     * @param  string|null  $name
      * @return \Illuminate\Database\Connection
      */
     public function connection($name = null)
     {
-        $name = enum_value($name) ?: $this->getDefaultConnection();
+        $name = $name ?: $this->getDefaultConnection();
 
         [$database, $type] = $this->parseConnectionName($name);
 
@@ -118,7 +117,9 @@ class DatabaseManager implements ConnectionResolverInterface
      */
     public function build(array $config)
     {
-        $config['name'] ??= static::calculateDynamicConnectionName($config);
+        if (! isset($config['name'])) {
+            $config['name'] = static::calculateDynamicConnectionName($config);
+        }
 
         $this->dynamicConnectionConfigurations[$config['name']] = $config;
 
@@ -176,8 +177,7 @@ class DatabaseManager implements ConnectionResolverInterface
         $name = $name ?: $this->getDefaultConnection();
 
         return Str::endsWith($name, ['::read', '::write'])
-            ? explode('::', $name, 2)
-            : [$name, null];
+                            ? explode('::', $name, 2) : [$name, null];
     }
 
     /**
@@ -354,11 +354,9 @@ class DatabaseManager implements ConnectionResolverInterface
 
         $this->setDefaultConnection($name);
 
-        try {
-            return $callback();
-        } finally {
+        return tap($callback(), function () use ($previousName) {
             $this->setDefaultConnection($previousName);
-        }
+        });
     }
 
     /**

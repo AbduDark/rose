@@ -30,7 +30,7 @@ class ScheduleWorkCommand extends Command
     /**
      * Execute the console command.
      *
-     * @return never
+     * @return void
      */
     public function handle()
     {

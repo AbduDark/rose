@@ -5,7 +5,6 @@ namespace Illuminate\Mail;
 use Closure;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Filesystem\Factory as FilesystemFactory;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Traits\Macroable;
 use RuntimeException;
 
@@ -38,6 +37,7 @@ class Attachment
      * Create a mail attachment.
      *
      * @param  \Closure  $resolver
+     * @return void
      */
     private function __construct(Closure $resolver)
     {
@@ -78,23 +78,6 @@ class Attachment
         return (new static(
             fn ($attachment, $pathStrategy, $dataStrategy) => $dataStrategy($data, $attachment)
         ))->as($name);
-    }
-
-    /**
-     * Create a mail attachment from an UploadedFile instance.
-     *
-     * @param  \Illuminate\Http\UploadedFile  $file
-     * @return static
-     */
-    public static function fromUploadedFile(UploadedFile $file)
-    {
-        return new static(function ($attachment, $pathStrategy, $dataStrategy) use ($file) {
-            $attachment
-                ->as($file->getClientOriginalName())
-                ->withMime($file->getMimeType() ?? $file->getClientMimeType());
-
-            return $dataStrategy(fn () => $file->get(), $attachment);
-        });
     }
 
     /**
