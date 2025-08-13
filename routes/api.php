@@ -2,133 +2,146 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
-use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\CourseController;
-use App\Http\Controllers\Api\LessonController;
-use App\Http\Controllers\Api\SubscriptionController;
-use App\Http\Controllers\Api\FavoriteController;
-use App\Http\Controllers\Api\CommentController;
-use App\Http\Controllers\Api\RatingController;
-use App\Http\Controllers\Api\PaymentController;
-use App\Http\Controllers\Api\UserController;
-use App\Http\Controllers\Api\AdminController;
-use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\{
+    AuthController,
+    CourseController,
+    LessonController,
+    SubscriptionController,
+    FavoriteController,
+    CommentController,
+    RatingController,
+    PaymentController,
+    UserController,
+    AdminController,
+    NotificationController
+};
 use App\Http\Middleware\AdminMiddleware;
 
-// Health check endpoint
+/*
+|--------------------------------------------------------------------------
+| Health Check Routes
+|--------------------------------------------------------------------------
+*/
 Route::get('/', function () {
     return response()->json([
-        'message' => 'Rose Academy API is running',
-        'version' => '1.0.0',
+        'message'   => 'Rose Academy API is running',
+        'version'   => '1.0.0',
         'timestamp' => now(),
-        'status' => 'active'
+        'status'    => 'active'
     ]);
 });
+Route::get('/health', fn() => response()->json(['status' => 'OK', 'timestamp' => now()]));
 
-Route::get('/health', function () {
-    return response()->json(['status' => 'OK', 'timestamp' => now()]);
-});
-
-// Public Routes
+/*
+|--------------------------------------------------------------------------
+| Public Routes
+|--------------------------------------------------------------------------
+*/
 Route::prefix('auth')->middleware('throttle:10,1')->group(function () {
     Route::post('register',        [AuthController::class, 'register']);
     Route::post('login',           [AuthController::class, 'login']);
     Route::post('forgot-password', [AuthController::class, 'forgotPassword']);
-    Route::get('/verify-email',    [AuthController::class, 'verifyEmail']);
+    Route::get('verify-email',     [AuthController::class, 'verifyEmail']);
     Route::post('reset-password',  [AuthController::class, 'resetPassword']);
     Route::post('force-logout',    [AuthController::class, 'forceLogout']);
-    Route::post('/resend-pin',     [AuthController::class, 'resendPin']);
-    Route::get('/avatars/{filename}', [UserController::class, 'getAvatar']);
+    Route::post('resend-pin',      [AuthController::class, 'resendPin']);
+    Route::get('avatars/{filename}', [UserController::class, 'getAvatar']);
 });
 
-// Guest-accessible courses
-Route::get('courses',       [CourseController::class, 'index']);
-Route::get('courses/{id}',  [CourseController::class, 'show']);
-Route::get('courses/{id}/ratings', [RatingController::class, 'index']);
+Route::get('courses',                  [CourseController::class, 'index']);
+Route::get('courses/{id}',             [CourseController::class, 'show']);
+Route::get('courses/{id}/ratings',     [RatingController::class, 'index']);
 
-// Authenticated User Routes
+/*
+|--------------------------------------------------------------------------
+| Authenticated User Routes
+|--------------------------------------------------------------------------
+*/
 Route::middleware(['auth:sanctum'])->group(function () {
     // Authentication
     Route::prefix('auth')->group(function () {
-        Route::get('/profile', [AuthController::class, 'profile']);
-        Route::post('/logout', [AuthController::class, 'logout']);
-        Route::put('/profile', [AuthController::class, 'updateProfile']);
-        Route::patch('/profile', [AuthController::class, 'updateProfile']);
-        Route::post('/refresh', [AuthController::class, 'refresh']);
+        Route::get('profile',   [AuthController::class, 'profile']);
+        Route::put('profile',   [AuthController::class, 'updateProfile']);
+        Route::put('password',         [AuthController::class, 'changePassword']);
+        Route::patch('profile', [AuthController::class, 'updateProfile']);
+        Route::post('refresh',  [AuthController::class, 'refresh']);
+        Route::post('logout',   [AuthController::class, 'logout']);
     });
 
-    // Subscription routes
-    Route::post('/subscribe', [SubscriptionController::class, 'subscribe']);
-    Route::get('/my-subscriptions', [SubscriptionController::class, 'mySubscriptions']);
-    Route::post('/subscriptions/{id}/cancel', [SubscriptionController::class, 'cancelSubscription']);
-    Route::post('/subscriptions/renew', [SubscriptionController::class, 'renewSubscription']);
-    Route::get('/expired-subscriptions', [SubscriptionController::class, 'getExpiredSubscriptions']);
-    Route::get('/subscriptions/status/{courseId}', [SubscriptionController::class, 'getSubscriptionStatus']);
+    // Subscriptions
+    Route::post('subscribe',                           [SubscriptionController::class, 'subscribe']);
+    Route::get('my-subscriptions',                     [SubscriptionController::class, 'mySubscriptions']);
+    Route::post('subscriptions/{id}/cancel',           [SubscriptionController::class, 'cancelSubscription']);
+    Route::post('subscriptions/renew',                 [SubscriptionController::class, 'renewSubscription']);
+    Route::get('expired-subscriptions',                [SubscriptionController::class, 'getExpiredSubscriptions']);
+    Route::get('subscriptions/status/{courseId}',      [SubscriptionController::class, 'getSubscriptionStatus']);
 
-    // Notification routes
-    Route::get('/notifications', [NotificationController::class, 'index']);
-    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
-    Route::get('/notifications/{id}', [NotificationController::class, 'show']);
-    Route::put('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
-    Route::put('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
-    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
+    // Notifications
+    Route::get('notifications',                        [NotificationController::class, 'index']);
+    Route::get('notifications/unread-count',           [NotificationController::class, 'unreadCount']);
+    Route::get('notifications/{id}',                   [NotificationController::class, 'show']);
+    Route::put('notifications/{id}/read',              [NotificationController::class, 'markAsRead']);
+    Route::put('notifications/mark-all-read',          [NotificationController::class, 'markAllAsRead']);
+    Route::delete('notifications/{id}',                [NotificationController::class, 'destroy']);
 
-    // Comments Routes
-    Route::post('/comments', [CommentController::class, 'store']);                           // إضافة تعليق
-    Route::get('/my-comments', [CommentController::class, 'getUserComments']);       // تعليقات المستخدم
-    Route::delete('/comments/{id}', [CommentController::class, 'destroy']);                  // حذف تعليق
-
-
-    // Lesson Comments
-    Route::get('lessons/{lessonId}/comments', [CommentController::class, 'getLessonComments']);
+    // Comments
+    Route::post('comments',                            [CommentController::class, 'store']);
+    Route::get('my-comments',                          [CommentController::class, 'getUserComments']);
+    Route::delete('comments/{id}',                     [CommentController::class, 'destroy']);
+    Route::get('lessons/{lessonId}/comments',          [CommentController::class, 'getLessonComments']);
 
     // Favorites
-    Route::post('favorite/{course_id}',    [FavoriteController::class, 'add']);
-    Route::delete('favorite/{course_id}',  [FavoriteController::class, 'remove']);
+    Route::post('favorite/{course_id}',                [FavoriteController::class, 'add']);
+    Route::delete('favorite/{course_id}',              [FavoriteController::class, 'remove']);
 
     // Lessons
-    Route::get('courses/{id}/lessons',     [LessonController::class, 'index']);
-    Route::get('lessons/{id}',             [LessonController::class, 'show']);
+    Route::get('courses/{id}/lessons',                 [LessonController::class, 'index']);
+    Route::get('lessons/{id}',                         [LessonController::class, 'show']);
 
     // Ratings
-    Route::post('ratings',                 [RatingController::class, 'store']);
+    Route::post('ratings',                             [RatingController::class, 'store']);
 });
 
-// Admin Routes (Protected)
-Route::middleware(['auth:sanctum', AdminMiddleware::class])->prefix('admin')->group(function () {
-    // إدارة الكورسات
+/*
+|--------------------------------------------------------------------------
+| Admin Routes
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth:sanctum', AdminMiddleware::class])
+    ->prefix('admin')
+    ->group(function () {
+
+    // Courses & Lessons
     Route::apiResource('courses', CourseController::class)->except(['index', 'show']);
     Route::apiResource('lessons', LessonController::class)->except(['index', 'show']);
 
-    // إدارة المستخدمين
+    // Users
     Route::controller(AdminController::class)->group(function () {
-        Route::get('users', 'getUsers');
-        Route::get('users/{id}', 'getUserDetails');
-        Route::put('users/{id}', 'updateUser');
-        Route::delete('users/{id}', 'deleteUser');
+        Route::get('users',                 'getUsers');
+        Route::get('users/{id}',             'getUserDetails');
+        Route::put('users/{id}',             'updateUser');
+        Route::delete('users/{id}',          'deleteUser');
+        Route::get('dashboard/stats',        'getDashboardStats');
 
-        // إحصائيات الدشبورد
-        Route::get('dashboard/stats', 'getDashboardStats');
-
-        // إدارة الاشتراكات
-        Route::get('subscriptions', 'getSubscriptions');
-        Route::get('subscriptions/pending', 'getPendingSubscriptions');
+        // Subscriptions
+        Route::get('subscriptions',          'getSubscriptions');
+        Route::get('subscriptions/pending',  'getPendingSubscriptions');
         Route::post('subscriptions/{id}/approve', 'approveSubscription');
-        Route::post('subscriptions/{id}/reject', 'rejectSubscription');
+        Route::post('subscriptions/{id}/reject',  'rejectSubscription');
     });
 
-    // إدارة التعليقات (Admin)
+    // Comments
     Route::prefix('comments')->group(function () {
-        Route::get('/pending', [CommentController::class, 'getPendingComments']);        // التعليقات المعلقة
-        Route::post('/{id}/approve', [CommentController::class, 'approveComment']);      // الموافقة على تعليق
+        Route::get('pending',                 [CommentController::class, 'getPendingComments']);
+        Route::post('{id}/approve',           [CommentController::class, 'approveComment']);
     });
 
-    // Admin subscription management
-    Route::get('/subscriptions', [SubscriptionController::class, 'adminIndex']);
-    Route::put('/subscriptions/{id}/approve', [SubscriptionController::class, 'approve']);
-    Route::put('/subscriptions/{id}/reject', [SubscriptionController::class, 'reject']);
+    // Admin Subscriptions
+    Route::get('subscriptions',               [SubscriptionController::class, 'adminIndex']);
+    Route::put('subscriptions/{id}/approve',  [SubscriptionController::class, 'approve']);
+    Route::put('subscriptions/{id}/reject',   [SubscriptionController::class, 'reject']);
 
-    // Admin notification management
-    Route::post('/notifications/send', [NotificationController::class, 'sendNotification']);
-    Route::get('/notifications/statistics', [NotificationController::class, 'statistics']);
+    // Notifications
+    Route::post('notifications/send',         [NotificationController::class, 'sendNotification']);
+    Route::get('notifications/statistics',    [NotificationController::class, 'statistics']);
 });
