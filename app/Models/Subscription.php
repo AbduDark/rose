@@ -114,8 +114,12 @@ class Subscription extends Model
             return null;
         }
 
-        $diff = $this->expires_at->diffInDays(now(), false);
-        return $this->expires_at->isFuture() ? $diff : 0;
+        $now = now();
+        if ($this->expires_at <= $now) {
+            return 0;
+        }
+
+        return $now->diffInDays($this->expires_at);
     }
 
     public function getHoursRemaining()

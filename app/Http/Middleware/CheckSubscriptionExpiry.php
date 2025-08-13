@@ -43,7 +43,7 @@ class CheckSubscriptionExpiry
                             'id' => $sub->id,
                             'course_id' => $sub->course_id,
                             'course_title' => $sub->course->title ?? null,
-                            'expired_at' => $sub->expires_at
+                            'expires_at' => $sub->expires_at
                         ];
                     })
                 ]);
