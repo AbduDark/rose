@@ -173,7 +173,7 @@ class LargeCourseSeeder extends Seeder
             }
         }
 
-        // إنشاء تعليقات على الدروس
+        // إنشاء تعليقات على الدروس (بدون نظام الموافقة)
         $allLessons = Lesson::all();
         foreach ($users as $user) {
             $randomLessons = $allLessons->random(rand(5, 15));
@@ -191,13 +191,11 @@ class LargeCourseSeeder extends Seeder
                 ];
 
                 Comment::create([
-    'user_id' => $user->id,
-    'lesson_id' => $lesson->id,
-    'course_id' => $lesson->course_id, // حل المشكلة
-    'content' => $comments[array_rand($comments)],
-    'is_approved' => rand(0, 1) ? true : false
-]);
-
+                    'user_id' => $user->id,
+                    'lesson_id' => $lesson->id,
+                    'course_id' => $lesson->course_id,
+                    'content' => $comments[array_rand($comments)]
+                ]);
             }
         }
 
