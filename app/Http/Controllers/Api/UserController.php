@@ -72,7 +72,24 @@ class UserController extends Controller
             'password' => 'sometimes|min:8|confirmed',
         ]);
 
-        $data = $request->only(['name', 'email', 'phone', 'gender']);
+        // Only get fields that are actually present and not empty
+        $data = [];
+
+        if ($request->filled('name')) {
+            $data['name'] = $request->name;
+        }
+
+        if ($request->filled('email')) {
+            $data['email'] = $request->email;
+        }
+
+        if ($request->filled('phone')) {
+            $data['phone'] = $request->phone;
+        }
+
+        if ($request->filled('gender')) {
+            $data['gender'] = $request->gender;
+        }
 
         if ($request->filled('password')) {
             $data['password'] = Hash::make($request->password);
@@ -84,11 +101,15 @@ class UserController extends Controller
             ]);
         }
 
-        $user->update($data);
+        // Only update if there's data to update
+        if (!empty($data)) {
+            $user->update($data);
+        }
 
         return response()->json([
             'message' => 'Profile updated successfully',
-            'user' => $user->fresh()
+            'user' => $user->fresh(),
+            'updated_fields' => array_keys($data)
         ]);
     }
 
