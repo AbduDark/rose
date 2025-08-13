@@ -1,4 +1,3 @@
-
 <?php
 
 namespace App\Console\Commands;
@@ -36,7 +35,7 @@ class SendExpiryReminders extends Command
 
         foreach ($subscriptionsExpiredToday as $subscription) {
             $this->warn("انتهاء: اشتراك {$subscription->user->name} في كورس {$subscription->course->title} انتهى اليوم");
-            
+
             // إلغاء تفعيل الاشتراك المنتهي
             $subscription->update(['is_active' => false]);
         }
