@@ -171,6 +171,19 @@ class NotificationService
 
         return self::sendToUser(
             $userId,
+            'تذكير: اشتراكك ينتهي قريباً',
+            "سينتهي اشتراكك في كورس '{$course->title}' خلال {$daysRemaining} يوم. يرجى تجديد الاشتراك للاستمرار في الوصول للكورس.",
+            'subscription',
+            $courseId,
+            null,
+            ['action' => 'subscription_expiring', 'course_id' => $courseId, 'days_remaining' => $daysRemaining]
+        );
+    }courseId, $daysRemaining)
+    {
+        $course = Course::find($courseId);
+
+        return self::sendToUser(
+            $userId,
             'تذكير: اشتراكك على وشك الانتهاء',
             "سينتهي اشتراكك في كورس: {$course->title} خلال {$daysRemaining} أيام. يرجى تجديد الاشتراك.",
             'subscription',
