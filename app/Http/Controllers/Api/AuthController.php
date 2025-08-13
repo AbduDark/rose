@@ -445,10 +445,15 @@ public function updateProfile(Request $request)
         }
 
         // البيانات التي سيتم تحديثها
-        $updateData = array_filter([
-            'name'  => $request->name,
-            'phone' => $request->phone,
-        ]);
+        $updateData = [];
+
+        if ($request->has('name')) {
+            $updateData['name'] = $request->name;
+        }
+
+        if ($request->has('phone')) {
+            $updateData['phone'] = $request->phone;
+        }
 
         // رفع الصورة إذا وجدت
         if ($request->hasFile('image')) {
@@ -478,6 +483,9 @@ public function updateProfile(Request $request)
         // تحديث بيانات المستخدم
         $user->update($updateData);
 
+        // تحديث قيمة الصورة في الكائن الحالي
+        $user->refresh();
+
         // الاستجابة
         return $this->successResponse([
             'user' => [
@@ -505,6 +513,7 @@ public function updateProfile(Request $request)
         return $this->serverErrorResponse();
     }
 }
+
 
 
 
