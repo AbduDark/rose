@@ -4,6 +4,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Subscription;
+use App\Services\NotificationService;
 use Illuminate\Console\Command;
 
 class SendExpiryReminders extends Command
@@ -23,7 +24,13 @@ class SendExpiryReminders extends Command
         foreach ($subscriptionsExpiringSoon as $subscription) {
             $daysRemaining = $subscription->getDaysRemaining();
 
-            // هنا يمكنك إضافة إرسال إشعار أو بريد إلكتروني
+            // إرسال إشعار للمستخدم
+            NotificationService::subscriptionExpiringReminder(
+                $subscription->user_id,
+                $subscription->course_id,
+                $daysRemaining
+            );
+
             $this->info("تذكير: اشتراك {$subscription->user->name} في كورس {$subscription->course->title} سينتهي خلال {$daysRemaining} يوم");
         }
 
@@ -35,6 +42,12 @@ class SendExpiryReminders extends Command
             ->get();
 
         foreach ($subscriptionsExpiredToday as $subscription) {
+            // إرسال إشعار انتهاء الاشتراك
+            NotificationService::subscriptionExpired(
+                $subscription->user_id,
+                $subscription->course_id
+            );
+
             $this->warn("انتهاء: اشتراك {$subscription->user->name} في كورس {$subscription->course->title} انتهى اليوم");
             
             // إلغاء تفعيل الاشتراك المنتهي
