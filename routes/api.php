@@ -52,7 +52,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::prefix('auth')->group(function () {
         Route::get('/profile', [AuthController::class, 'profile']);
         Route::post('/logout', [AuthController::class, 'logout']);
-        Route::put('/profile', [UserController::class, 'updateProfile']);
+        Route::put('/update', [UserController::class, 'updateProfile']);
         Route::post('/refresh', [AuthController::class, 'refresh']);
     });
 
