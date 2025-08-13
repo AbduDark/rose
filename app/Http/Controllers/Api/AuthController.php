@@ -434,6 +434,13 @@ public function updateProfile(Request $request)
             ], 404);
         }
 
+        // Log: بداية العملية
+        Log::info('--- Start updateProfile ---', [
+            'user_id' => $user->id,
+            'request_data' => $request->all(),
+            'has_file_image' => $request->hasFile('image')
+        ]);
+
         $validator = Validator::make($request->all(), [
             'name'  => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:20|unique:users,phone,' . $user->id,
@@ -441,62 +448,56 @@ public function updateProfile(Request $request)
         ]);
 
         if ($validator->fails()) {
+            Log::warning('Validation failed', $validator->errors()->toArray());
             return $this->validationErrorResponse(new ValidationException($validator));
         }
 
-        // البيانات التي سيتم تحديثها
-        $updateData = [];
+        $updateData = array_filter([
+            'name'  => $request->name,
+            'phone' => $request->phone,
+        ], function ($value) {
+            return !is_null($value);
+        });
 
-        if ($request->has('name')) {
-            $updateData['name'] = $request->name;
-        }
+        // Log: البيانات قبل الصورة
+        Log::info('Update data before image', $updateData);
 
-        if ($request->has('phone')) {
-            $updateData['phone'] = $request->phone;
-        }
-
-        // رفع الصورة إذا وجدت
+        // Handle image upload
         if ($request->hasFile('image')) {
             $image = $request->file('image');
 
-            // حذف الصورة القديمة إذا كانت موجودة
+            // حذف الصورة القديمة
             if ($user->image && file_exists(public_path($user->image))) {
                 @unlink(public_path($user->image));
             }
 
-            // اسم الملف الجديد
+            // رفع الصورة الجديدة
             $imageName = uniqid('avatar_') . '.' . $image->getClientOriginalExtension();
             $uploadPath = public_path('uploads/avatars');
 
-            // إنشاء المجلد إذا لم يكن موجود
             if (!file_exists($uploadPath)) {
                 mkdir($uploadPath, 0755, true);
             }
 
-            // نقل الصورة
             $image->move($uploadPath, $imageName);
-
-            // حفظ المسار في قاعدة البيانات
             $updateData['image'] = 'uploads/avatars/' . $imageName;
+
+            Log::info('Image uploaded', [
+                'path' => $updateData['image']
+            ]);
         }
 
-        // تحديث بيانات المستخدم
+        // Log: البيانات النهائية
+        Log::info('Final update data', $updateData);
+
+        // تحديث البيانات
         $user->update($updateData);
 
-        // تحديث قيمة الصورة في الكائن الحالي
-        $user->refresh();
+        // Log: البيانات بعد التحديث
+        Log::info('User after update', $user->fresh()->toArray());
 
-        // الاستجابة
         return $this->successResponse([
-            'user' => [
-                'id'        => $user->id,
-                'name'      => $user->name,
-                'email'     => $user->email,
-                'phone'     => $user->phone,
-                'gender'    => $user->gender,
-                'role'      => $user->role ?? 'student',
-                'image_url' => $user->image ? url($user->image) : null,
-            ]
+            'user' => $user->fresh()
         ], [
             'ar' => 'تم تحديث الملف الشخصي بنجاح',
             'en' => 'Profile updated successfully'
@@ -513,6 +514,7 @@ public function updateProfile(Request $request)
         return $this->serverErrorResponse();
     }
 }
+
 
 
 
