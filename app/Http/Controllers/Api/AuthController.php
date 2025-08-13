@@ -422,7 +422,7 @@ class AuthController extends Controller
         }
     }
 
-public function updateProfile(Request $request)
+    public function updateProfile(Request $request)
 {
     try {
         $user = $request->user();
