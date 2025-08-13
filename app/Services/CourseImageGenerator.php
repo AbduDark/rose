@@ -2,17 +2,11 @@
 
 namespace App\Services;
 
-use Intervention\Image\ImageManager ;;
+use Intervention\Image\ImageManager;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\Facades\Image;
-
-
-
-
-
-
 
 /**
  * CourseImageGenerator
@@ -23,7 +17,6 @@ use Intervention\Image\Facades\Image;
 class CourseImageGenerator
 {
     private array $templates;
-
     private string $defaultFont;
 
     public function __construct()
@@ -33,57 +26,31 @@ class CourseImageGenerator
                 'id' => 'tpl1',
                 'file' => public_path('templates/template1.jpg'),
                 'positions' => [
-                    'title' => ['x' => 60, 'y' => 80,  'width' => 620, 'size' => 36, 'color' => '#ffffff', 'align' => 'left'],
+                    'title' => [
+                        'x' => 177,
+                        'y' => 177,
+                        'width' => 365,
+                        'size' => 60,
+                        'color' => '#ffffff',
+                        'align' => 'left',
+                        'stroke' => [
+                            'size' => 2,
+                            'color' => '#ffffff'
+                        ],
+                        'outline' => [
+                            'color' => '#000000',
+                            'opacity' => 18,
+                            'size' => 13,
+                            'range' => 50
+                        ]
+                    ],
                     'price' => ['x' => 60, 'y' => 420, 'width' => 300, 'size' => 22, 'color' => '#ffd700', 'align' => 'left'],
                     'grade' => ['x' => 60, 'y' => 460, 'width' => 300, 'size' => 18, 'color' => '#ffffff', 'align' => 'left'],
                     'description' => ['x' => 60, 'y' => 130, 'width' => 620, 'size' => 18, 'color' => '#ffffff', 'align' => 'left'],
                     'logo' => ['x' => 40, 'y' => 520, 'size' => 40, 'align' => 'left']
                 ]
             ],
-            [
-                'id' => 'tpl2',
-                'file' => public_path('templates/template2.jpg'),
-                'positions' => [
-                    'title' => ['x' => 80, 'y' => 120, 'width' => 560, 'size' => 34, 'color' => '#000000', 'align' => 'left'],
-                    'price' => ['x' => 620, 'y' => 120, 'width' => 200, 'size' => 20, 'color' => '#000000', 'align' => 'right'],
-                    'grade' => ['x' => 80, 'y' => 420, 'width' => 560, 'size' => 18, 'color' => '#000000', 'align' => 'left'],
-                    'description' => ['x' => 80, 'y' => 170, 'width' => 560, 'size' => 16, 'color' => '#333333', 'align' => 'left'],
-                    'logo' => ['x' => 60, 'y' => 520, 'size' => 36, 'align' => 'left']
-                ]
-            ],
-            [
-                'id' => 'tpl3',
-                'file' => public_path('templates/template3.jpg'),
-                'positions' => [
-                    'title' => ['x' => 100, 'y' => 60,  'width' => 520, 'size' => 38, 'color' => '#ffffff', 'align' => 'left'],
-                    'price' => ['x' => 100, 'y' => 420, 'width' => 300, 'size' => 20, 'color' => '#ffffff', 'align' => 'left'],
-                    'grade' => ['x' => 100, 'y' => 455, 'width' => 300, 'size' => 18, 'color' => '#ffffff', 'align' => 'left'],
-                    'description' => ['x' => 100, 'y' => 110, 'width' => 520, 'size' => 16, 'color' => '#ffffff', 'align' => 'left'],
-                    'logo' => ['x' => 660, 'y' => 520, 'size' => 34, 'align' => 'right']
-                ]
-            ],
-            [
-                'id' => 'tpl4',
-                'file' => public_path('templates/template4.jpg'),
-                'positions' => [
-                    'title' => ['x' => 40, 'y' => 40,  'width' => 720, 'size' => 40, 'color' => '#ffffff', 'align' => 'center'],
-                    'price' => ['x' => 40, 'y' => 500, 'width' => 350, 'size' => 24, 'color' => '#ffffff', 'align' => 'left'],
-                    'grade' => ['x' => 420, 'y' => 500, 'width' => 350, 'size' => 20, 'color' => '#ffffff', 'align' => 'right'],
-                    'description' => ['x' => 40, 'y' => 120, 'width' => 720, 'size' => 18, 'color' => '#ffffff', 'align' => 'center'],
-                    'logo' => ['x' => 680, 'y' => 40, 'size' => 40, 'align' => 'right']
-                ]
-            ],
-            [
-                'id' => 'tpl5',
-                'file' => public_path('templates/template5.jpg'),
-                'positions' => [
-                    'title' => ['x' => 60, 'y' => 100, 'width' => 600, 'size' => 36, 'color' => '#ffffff', 'align' => 'left'],
-                    'price' => ['x' => 60, 'y' => 420, 'width' => 300, 'size' => 22, 'color' => '#00ff00', 'align' => 'left'],
-                    'grade' => ['x' => 60, 'y' => 460, 'width' => 300, 'size' => 18, 'color' => '#ffffff', 'align' => 'left'],
-                    'description' => ['x' => 60, 'y' => 150, 'width' => 600, 'size' => 16, 'color' => '#ffffff', 'align' => 'left'],
-                    'logo' => ['x' => 40, 'y' => 520, 'size' => 36, 'align' => 'left']
-                ]
-            ],
+            // Other templates can be uncommented and updated as needed
         ];
 
         $this->defaultFont = public_path('fonts/NotoSansArabic-Regular.ttf');
@@ -102,9 +69,9 @@ class CourseImageGenerator
             throw new \InvalidArgumentException('Title is required for course image generation');
         }
 
-        // اختيار تميبليت عشوائي
+        // Select random template
         $tpl = $this->templates[array_rand($this->templates)];
-        
+
         Log::info("Selected template: {$tpl['id']} for course: {$data['title']}");
 
         if (!file_exists($tpl['file'])) {
@@ -115,7 +82,7 @@ class CourseImageGenerator
         try {
             $img = Image::make($tpl['file']);
             $fontPath = file_exists($this->defaultFont) ? $this->defaultFont : null;
-            
+
             Log::info("Using font: " . ($fontPath ? $fontPath : 'system default'));
 
             $this->addTextElements($img, $tpl, $data, $fontPath);
@@ -126,7 +93,7 @@ class CourseImageGenerator
 
             $imagePath = $this->saveImage($img);
             Log::info("Course image generated successfully: {$imagePath}");
-            
+
             return $imagePath;
         } catch (\Exception $e) {
             Log::error('Course image generation failed: ' . $e->getMessage());
@@ -153,7 +120,8 @@ class CourseImageGenerator
                 $fontPath,
                 $pos['size'] ?? 18,
                 $pos['color'] ?? '#000000',
-                $pos['align'] ?? 'left'
+                $pos['align'] ?? 'left',
+                $pos // Pass the entire position array for additional styling
             );
         }
 
@@ -168,7 +136,8 @@ class CourseImageGenerator
                 $fontPath,
                 $pos['size'] ?? 16,
                 $pos['color'] ?? '#fff',
-                $pos['align'] ?? 'left'
+                $pos['align'] ?? 'left',
+                $pos
             );
         }
     }
@@ -222,17 +191,66 @@ class CourseImageGenerator
         return $relativePath;
     }
 
-    private function drawTextBox($img, string $text, int $x, int $y, int $boxWidth, ?string $fontPath, int $fontSize, string $hexColor, string $align = 'left'): void
+    private function drawTextBox($img, string $text, int $x, int $y, int $boxWidth, ?string $fontPath, int $fontSize, string $hexColor, string $align = 'left', array $position = []): void
     {
         try {
             $lines = $this->wrapTextToLines($text, $fontPath, $fontSize, $boxWidth);
             $lineHeight = (int)($fontSize * 1.25);
             $startX = $this->computeX($img->width(), $x, $align, null);
 
+            // Get additional styling options
+            $strokeSize = $position['stroke']['size'] ?? 0;
+            $strokeColor = $position['stroke']['color'] ?? '#ffffff';
+            $outlineColor = $position['outline']['color'] ?? '#000000';
+            $outlineOpacity = $position['outline']['opacity'] ?? 18;
+            $outlineSize = $position['outline']['size'] ?? 13;
+            $outlineRange = $position['outline']['range'] ?? 50;
+
             Log::info("Drawing text: {$text} at position ({$startX}, {$y}) with {$fontSize}px font");
 
             foreach ($lines as $i => $line) {
                 $lineY = $y + ($i * $lineHeight);
+
+                // Draw outline/outer glow effect
+                if ($outlineSize > 0) {
+                    for ($o = 1; $o <= $outlineSize; $o++) {
+                        $img->text($line, $startX, $lineY, function ($font) use ($fontPath, $fontSize, $outlineColor, $align, $outlineOpacity) {
+                            if ($fontPath && file_exists($fontPath)) {
+                                $font->file($fontPath);
+                            }
+                            $font->size($fontSize);
+                            $font->color($outlineColor);
+                            $font->align($align);
+                            $font->valign('top');
+                            $font->opacity($outlineOpacity);
+                        });
+                    }
+                }
+
+                // Draw stroke effect
+                if ($strokeSize > 0) {
+                    for ($s = 1; $s <= $strokeSize; $s++) {
+                        // Draw stroke in all directions
+                        $offsets = [
+                            [$s, 0], [-$s, 0], [0, $s], [0, -$s],  // horizontal and vertical
+                            [$s, $s], [-$s, -$s], [$s, -$s], [-$s, $s]  // diagonal
+                        ];
+
+                        foreach ($offsets as $offset) {
+                            $img->text($line, $startX + $offset[0], $lineY + $offset[1], function ($font) use ($fontPath, $fontSize, $strokeColor, $align) {
+                                if ($fontPath && file_exists($fontPath)) {
+                                    $font->file($fontPath);
+                                }
+                                $font->size($fontSize);
+                                $font->color($strokeColor);
+                                $font->align($align);
+                                $font->valign('top');
+                            });
+                        }
+                    }
+                }
+
+                // Draw main text
                 $img->text($line, $startX, $lineY, function ($font) use ($fontPath, $fontSize, $hexColor, $align) {
                     if ($fontPath && file_exists($fontPath)) {
                         $font->file($fontPath);
@@ -245,7 +263,7 @@ class CourseImageGenerator
             }
         } catch (\Exception $e) {
             Log::warning("Failed to draw text '{$text}': " . $e->getMessage());
-            // رسم النص بدون خط مخصص كـ fallback
+            // Fallback drawing without effects
             $img->text($text, $x, $y, function ($font) use ($fontSize, $hexColor, $align) {
                 $font->size($fontSize);
                 $font->color($hexColor);
@@ -257,11 +275,9 @@ class CourseImageGenerator
 
     private function wrapTextToLines(string $text, ?string $fontFile, int $fontSize, int $maxWidth): array
     {
-        // معالجة النص العربي بشكل صحيح
         $text = $this->processArabicText($text);
-        
+
         if (!$fontFile || !file_exists($fontFile)) {
-            // تقدير تقريبي للنصوص العربية
             $charWidth = $fontSize * 0.6;
             $maxChars = max(5, (int)($maxWidth / $charWidth));
             $words = preg_split('/\s+/u', trim($text));
@@ -325,20 +341,9 @@ class CourseImageGenerator
         return $lines;
     }
 
-    /**
-     * معالجة النص العربي لضمان الاتصال الصحيح للحروف
-     */
     private function processArabicText(string $text): string
     {
-        // تنظيف النص وإعادة ترتيبه للعربية
-        $text = trim($text);
-        
-        // تحويل الأرقام الإنجليزية للعربية إذا لزم الأمر
-        $arabicNumerals = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-        $englishNumerals = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-        
-        // الحفاظ على الأرقام الإنجليزية كما هي في السياق التعليمي
-        return $text;
+        return trim($text);
     }
 
     private function computeX(int $imgWidth, int $x, string $align = 'left', ?int $elementWidth = null): int
@@ -361,6 +366,7 @@ class CourseImageGenerator
 
         return $x;
     }
+
     private function createFallbackImage(array $data): string
     {
         $img = Image::canvas(800, 600, '#2d3748');
