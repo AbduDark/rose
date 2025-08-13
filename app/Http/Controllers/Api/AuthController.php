@@ -422,7 +422,7 @@ class AuthController extends Controller
         }
     }
 
- public function updateProfile(Request $request)
+public function updateProfile(Request $request)
 {
     try {
         $user = $request->user();
@@ -444,44 +444,41 @@ class AuthController extends Controller
             return $this->validationErrorResponse(new ValidationException($validator));
         }
 
-        // Prepare update data
+        // البيانات التي سيتم تحديثها
         $updateData = array_filter([
             'name'  => $request->name,
             'phone' => $request->phone,
         ]);
 
-        // Handle image upload
+        // رفع الصورة إذا وجدت
+        if ($request->hasFile('image')) {
+            $image = $request->file('image');
 
-       if ($request->hasFile('image')) {
-    $image = $request->file('image');
+            // حذف الصورة القديمة إذا كانت موجودة
+            if ($user->image && file_exists(public_path($user->image))) {
+                @unlink(public_path($user->image));
+            }
 
-    // حذف الصورة القديمة إذا كانت موجودة
-    if ($user->image && file_exists(public_path($user->image))) {
-        @unlink(public_path($user->image));
-    }
+            // اسم الملف الجديد
+            $imageName = uniqid('avatar_') . '.' . $image->getClientOriginalExtension();
+            $uploadPath = public_path('uploads/avatars');
 
-    // اسم الملف الجديد
-    $imageName = uniqid('avatar_') . '.' . $image->getClientOriginalExtension();
-    $uploadPath = public_path('uploads/avatars');
+            // إنشاء المجلد إذا لم يكن موجود
+            if (!file_exists($uploadPath)) {
+                mkdir($uploadPath, 0755, true);
+            }
 
-    // إنشاء المجلد إذا لم يكن موجود
-    if (!file_exists($uploadPath)) {
-        mkdir($uploadPath, 0755, true);
-    }
+            // نقل الصورة
+            $image->move($uploadPath, $imageName);
 
-    // نقل الصورة
-    $image->move($uploadPath, $imageName);
+            // حفظ المسار في قاعدة البيانات
+            $updateData['image'] = 'uploads/avatars/' . $imageName;
+        }
 
-    // حفظ المسار في قاعدة البيانات
-    $updateData['image'] = 'uploads/avatars/' . $imageName;
-}
-
-
-
-        // Update user
+        // تحديث بيانات المستخدم
         $user->update($updateData);
 
-        // Response
+        // الاستجابة
         return $this->successResponse([
             'user' => [
                 'id'        => $user->id,
@@ -490,7 +487,7 @@ class AuthController extends Controller
                 'phone'     => $user->phone,
                 'gender'    => $user->gender,
                 'role'      => $user->role ?? 'student',
-                'image_url' => $user->image ?  url($user->image) : null,
+                'image_url' => $user->image ? url($user->image) : null,
             ]
         ], [
             'ar' => 'تم تحديث الملف الشخصي بنجاح',
@@ -502,12 +499,13 @@ class AuthController extends Controller
             'user_id' => $request->user()?->id,
             'error'   => $e->getMessage(),
             'trace'   => $e->getTraceAsString(),
-            'request' => collect($request->except(['password', 'token'])) // mask sensitive fields
+            'request' => collect($request->except(['password', 'token']))
         ]);
 
         return $this->serverErrorResponse();
     }
 }
+
 
 
 
