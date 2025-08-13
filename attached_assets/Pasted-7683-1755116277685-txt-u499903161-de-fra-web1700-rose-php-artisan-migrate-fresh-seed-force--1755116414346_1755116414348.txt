@@ -1,0 +1,87 @@
+7683_1755116277685.txt
+[u499903161@de-fra-web1700 rose]$ php artisan migrate:fresh --seed --force
+
+
+  Dropping all tables ..................................................................................................... 115.45ms DONE
+
+   INFO  Preparing database.
+
+  Creating migration table .................................................................................................. 8.39ms DONE
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   INFO  Running migrations.
+
+
+  2024_01_01_000001_create_users_table ...................................................................................... 7.85ms DONE
+
+  2024_01_01_000002_create_courses_table .................................................................................... 3.78ms DONE
+
+  2024_01_01_000003_create_lessons_table .................................................................................... 7.49ms DONE
+
+  2024_01_01_000004_create_subscriptions_table ............................................................................ 176.35ms DONE
+
+  2024_01_01_000005_create_favorites_table ................................................................................ 150.03ms DONE
+
+  2024_01_01_000007_create_ratings_table .................................................................................. 129.89ms DONE
+
+  2024_01_01_000008_create_payments_table .................................................................................. 19.33ms DONE
+
+  2024_01_01_000009_add_session_to_users_table .............................................................................. 4.48ms DONE
+
+  2025_01_01_000010_update_courses_and_lessons_gender ...................................................................... 20.43ms DONE
+  2025_01_01_000011_create_email_verifications_table ........................................................................ 5.81ms DONE
+
+  2025_01_15_000001_update_email_verifications_table ........................................................................ 5.35ms DONE
+
+  2025_01_15_000002_add_grade_to_courses_table .............................................................................. 1.08ms DONE
+
+  2025_01_16_000001_update_payments_table_for_vodafone ..................................................................... 51.11ms DONE
+
+  2025_01_16_000002_add_payment_id_to_subscriptions ......................................................................... 8.37ms DONE
+  2025_01_18_000001_update_subscriptions_for_new_system .................................................................... 33.29ms DONE
+
+  2025_01_18_000003_add_expires_at_to_subscriptions ......................................................................... 0.97ms DONE
+
+  2025_01_18_000004_create_notifications_table ............................................................................ 130.78ms DONE
+
+  2025_01_19_000001_create_comments_table ................................................................................. 383.19ms DONE
+  2025_01_20_000001_add_indexes_for_performance ........................................................................... 158.49ms FAIL
+
+   Illuminate\Database\QueryException
+
+  SQLSTATE[42000]: Syntax error or access violation: 1072 Key column 'is_active' doesn't exist in table (Connection: mysql, SQL: alter table `lessons` add index `lessons_is_active_index`(`is_active`))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:824
+    820▕                     $this->getName(), $query, $this->prepareBindings($bindings), $e
+    821▕                 );
+    822▕             }
+    823▕
+  ➜ 824▕             throw new QueryException(
+    825▕                 $this->getName(), $query, $this->prepareBindings($bindings), $e
+    826▕             );
+    827▕         }
+    828▕     }
+
+      +9 vendor frames
+
+  10  database/migrations/2025_01_20_000001_add_indexes_for_performance.php:25
+      Illuminate\Support\Facades\Facade::__callStatic()
+      +37 vendor frames
+
+  48  artisan:16
+      Illuminate\Foundation\Application::handleCommand()
