@@ -23,6 +23,7 @@ class CommentController extends Controller
     try {
         $validator = Validator::make($request->all(), [
             'lesson_id' => 'required|exists:lessons,id',
+            'course_id' => 'required|exists:courses,id',
             'content' => 'required|string|max:1000'
         ]);
 
