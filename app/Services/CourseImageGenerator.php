@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Utils;
+namespace App\Services;
 
 use Intervention\Image\ImageManager ;;
 use Illuminate\Support\Facades\Log;
