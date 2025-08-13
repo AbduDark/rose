@@ -2,328 +2,66 @@
 
 namespace App\Services;
 
-use Intervention\Image\ImageManager;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Intervention\Image\Drivers\Gd\Driver;
-use Intervention\Image\Facades\Image;
 
 /**
  * CourseImageGenerator
  *
- * Generates course images by selecting a random template and adding text/logo
- * based on predefined coordinates for each template.
+ * Selects a random template image without any text overlay.
  */
 class CourseImageGenerator
 {
     private array $templates;
-    private string $defaultFont;
 
     public function __construct()
     {
         $this->templates = [
-            [
-                'id' => 'template1',
-                'file' => public_path('templates/template1.jpg'),
-                'positions' => [
-                    'title' => [
-                        'x' => 790,
-                        'y' => 201,
-                        'width' => 435,
-                        'height' => 85,
-                        'size' => 60,
-                        'color' => '#ffffff',
-                        'align' => 'right',
-                        'stroke' => [
-                            'size' => 2,
-                            'color' => '#ffffff'
-                        ],
-                        'outline' => [
-                            'color' => '#000000',
-                            'opacity' => 18,
-                            'size' => 13,
-                            'range' => 50
-                        ]
-                    ],
-                    'grade' => [
-                        'x' => 876,
-                        'y' => 307,
-                        'width' => 260,
-                        'height' => 79,
-                        'size' => 60,
-                        'color' => '#ffffff',
-                        'align' => 'right',
-                        'stroke' => [
-                            'size' => 2,
-                            'color' => '#ffffff'
-                        ],
-                        'outline' => [
-                            'color' => '#000000',
-                            'opacity' => 18,
-                            'size' => 13,
-                            'range' => 50
-                        ]
-                    ]
-                ]
-            ],
-            [
-                'id' => 'template2',
-                'file' => public_path('templates/template2.jpg'),
-                'positions' => [
-                    'title' => [
-                        'x' => 773,
-                        'y' => 148,
-                        'width' => 356,
-                        'height' => 85,
-                        'size' => 60,
-                        'color' => '#ffffff',
-                        'align' => 'right',
-                        'stroke' => [
-                            'size' => 2,
-                            'color' => '#ffffff'
-                        ],
-                        'outline' => [
-                            'color' => '#000000',
-                            'opacity' => 18,
-                            'size' => 13,
-                            'range' => 50
-                        ]
-                    ],
-                    'grade' => [
-                        'x' => 829,
-                        'y' => 235,
-                        'width' => 244,
-                        'height' => 85,
-                        'size' => 60,
-                        'color' => '#ffffff',
-                        'align' => 'right',
-                        'stroke' => [
-                            'size' => 2,
-                            'color' => '#ffffff'
-                        ],
-                        'outline' => [
-                            'color' => '#000000',
-                            'opacity' => 18,
-                            'size' => 13,
-                            'range' => 50
-                        ]
-                    ]
-                ]
-            ],
-            [
-                'id' => 'template3',
-                'file' => public_path('templates/template3.jpg'),
-                'positions' => [
-                    'title' => [
-                        'x' => 760,
-                        'y' => 176,
-                        'width' => 365,
-                        'height' => 85,
-                        'size' => 60,
-                        'color' => '#ffffff',
-                        'align' => 'right',
-                        'stroke' => [
-                            'size' => 2,
-                            'color' => '#ffffff'
-                        ],
-                        'outline' => [
-                            'color' => '#000000',
-                            'opacity' => 18,
-                            'size' => 13,
-                            'range' => 50
-                        ]
-                    ],
-                    'grade' => [
-                        'x' => 805,
-                        'y' => 277,
-                        'width' => 258,
-                        'height' => 85,
-                        'size' => 60,
-                        'color' => '#ffffff',
-                        'align' => 'right',
-                        'stroke' => [
-                            'size' => 2,
-                            'color' => '#ffffff'
-                        ],
-                        'outline' => [
-                            'color' => '#000000',
-                            'opacity' => 18,
-                            'size' => 13,
-                            'range' => 50
-                        ]
-                    ]
-                ]
-            ]
+            public_path('templates/template1.jpg'),
+            public_path('templates/template2.jpg'),
+            public_path('templates/template3.jpg'),
         ];
-
-        // استخدام خط عربي مناسب
-        $this->defaultFont = public_path('fonts/NotoSansArabic-Bold.ttf');
     }
 
     /**
-     * Generate course image with provided data
+     * Generate course image by selecting a random template
      *
-     * @param array $data Required keys: title, grade. Optional: price, description, instructor, logo_path, currency
-     * @return string Relative path to the generated image
-     * @throws \InvalidArgumentException
+     * @param array $data Course data (not used but kept for compatibility)
+     * @return string Relative path to the selected/copied image
+     * @throws \RuntimeException
      */
     public function generateCourseImage(array $data): string
     {
-        if (empty($data['title'])) {
-            throw new \InvalidArgumentException('Title is required for course image generation');
-        }
-
-        // Select random template
-        $tpl = $this->templates[array_rand($this->templates)];
-
-        Log::info("Selected template: {$tpl['id']} for course: {$data['title']}");
-
-        if (!file_exists($tpl['file'])) {
-            Log::warning("Template file not found: {$tpl['file']}");
-            return $this->createFallbackImage($data);
-        }
-
         try {
-            $img = Image::make($tpl['file']);
-            $fontPath = file_exists($this->defaultFont) ? $this->defaultFont : null;
+            // Select random template
+            $randomTemplate = $this->templates[array_rand($this->templates)];
 
-            Log::info("Using font: " . ($fontPath ? $fontPath : 'system default'));
+            Log::info("Selected template: {$randomTemplate}");
 
-            // إضافة العنوان والصف فقط
-            $this->addTextElements($img, $tpl, $data, $fontPath);
-
-            $imagePath = $this->saveImage($img);
-            Log::info("Course image generated successfully: {$imagePath}");
-
-            return $imagePath;
-        } catch (\Exception $e) {
-            Log::error('Course image generation failed: ' . $e->getMessage());
-            Log::error('Stack trace: ' . $e->getTraceAsString());
-            return $this->createFallbackImage($data);
-        }
-    }
-
-    private function addTextElements($img, array $tpl, array $data, ?string $fontPath): void
-    {
-        // إضافة العنوان
-        if (!empty($data['title']) && !empty($tpl['positions']['title'])) {
-            $pos = $tpl['positions']['title'];
-            $this->drawTextBox(
-                $img,
-                $this->processArabicText($data['title']),
-                $pos['x'],
-                $pos['y'],
-                $pos['width'],
-                $fontPath,
-                $pos['size'],
-                $pos['color'],
-                $pos['align'],
-                $pos
-            );
-        }
-
-        // إضافة الصف
-        if (!empty($data['grade']) && !empty($tpl['positions']['grade'])) {
-            $pos = $tpl['positions']['grade'];
-            $this->drawTextBox(
-                $img,
-                $this->processArabicText($data['grade']),
-                $pos['x'],
-                $pos['y'],
-                $pos['width'],
-                $fontPath,
-                $pos['size'],
-                $pos['color'],
-                $pos['align'],
-                $pos
-            );
-        }
-    }
-
-    private function saveImage($img): string
-    {
-        $filename = Str::slug(uniqid('course_')) . '.jpg';
-        $relativePath = 'uploads/courses/' . $filename;
-        $fullPath = public_path($relativePath);
-
-        $directory = dirname($fullPath);
-        if (!file_exists($directory) && !mkdir($directory, 0755, true)) {
-            throw new \RuntimeException("Failed to create directory: {$directory}");
-        }
-
-        $img->save($fullPath, 88);
-        return $relativePath;
-    }
-
-    private function drawTextBox($img, string $text, int $x, int $y, int $boxWidth, ?string $fontPath, int $fontSize, string $hexColor, string $align = 'right', array $position = []): void
-    {
-        try {
-            $lines = $this->wrapTextToLines($text, $fontPath, $fontSize, $boxWidth);
-            $lineHeight = (int)($fontSize * 1.4); // زيادة المسافة بين الأسطر للعربية
-
-            // الحصول على خيارات التصميم الإضافية
-            $strokeSize = $position['stroke']['size'] ?? 0;
-            $strokeColor = $position['stroke']['color'] ?? '#ffffff';
-            $outlineColor = $position['outline']['color'] ?? '#000000';
-            $outlineOpacity = $position['outline']['opacity'] ?? 18;
-            $outlineSize = $position['outline']['size'] ?? 13;
-
-            Log::info("Drawing Arabic text: {$text} at position ({$x}, {$y}) with {$fontSize}px font");
-
-            foreach ($lines as $i => $line) {
-                $lineY = $y + ($i * $lineHeight);
-                $startX = $this->computeX($img->width(), $x, $align, $this->getTextWidth($line, $fontPath, $fontSize));
-
-                // رسم التأثير الخارجي (outer glow)
-                if ($outlineSize > 0) {
-                    for ($ox = -$outlineSize; $ox <= $outlineSize; $ox++) {
-                        for ($oy = -$outlineSize; $oy <= $outlineSize; $oy++) {
-                            if ($ox != 0 || $oy != 0) {
-                                $img->text($line, $startX + $ox, $lineY + $oy, function ($font) use ($fontPath, $fontSize, $outlineColor, $align, $outlineOpacity) {
-                                    if ($fontPath && file_exists($fontPath)) {
-                                        $font->file($fontPath);
-                                    }
-                                    $font->size($fontSize);
-                                    $font->color($outlineColor);
-                                    $font->align($align);
-                                    $font->valign('top');
-                                });
-                            }
-                        }
-                    }
-                }
-
-                // رسم الحدود (stroke)
-                if ($strokeSize > 0) {
-                    $offsets = [
-                        [$strokeSize, 0], [-$strokeSize, 0], [0, $strokeSize], [0, -$strokeSize],
-                        [$strokeSize, $strokeSize], [-$strokeSize, -$strokeSize], [$strokeSize, -$strokeSize], [-$strokeSize, $strokeSize]
-                    ];
-
-                    foreach ($offsets as $offset) {
-                        $img->text($line, $startX + $offset[0], $lineY + $offset[1], function ($font) use ($fontPath, $fontSize, $strokeColor, $align) {
-                            if ($fontPath && file_exists($fontPath)) {
-                                $font->file($fontPath);
-                            }
-                            $font->size($fontSize);
-                            $font->color($strokeColor);
-                            $font->align($align);
-                            $font->valign('top');
-                        });
-                    }
-                }
-
-                // رسم النص الأساسي
-                $img->text($line, $startX, $lineY, function ($font) use ($fontPath, $fontSize, $hexColor, $align) {
-                    if ($fontPath && file_exists($fontPath)) {
-                        $font->file($fontPath);
-                    }
-                    $font->size($fontSize);
-                    $font->color($hexColor);
-                    $font->align($align);
-                    $font->valign('top');
-                });
+            if (!file_exists($randomTemplate)) {
+                Log::warning("Template file not found: {$randomTemplate}");
+                throw new \RuntimeException("Template file not found: {$randomTemplate}");
             }
+
+            // Generate unique filename
+            $filename = Str::slug(uniqid('course_')) . '.jpg';
+            $relativePath = 'uploads/courses/' . $filename;
+            $fullPath = public_path($relativePath);
+
+            // Create directory if it doesn't exist
+            $directory = dirname($fullPath);
+            if (!file_exists($directory) && !mkdir($directory, 0755, true)) {
+                throw new \RuntimeException("Failed to create directory: {$directory}");
+            }
+
+            // Copy the template to the new location
+            if (!copy($randomTemplate, $fullPath)) {
+                throw new \RuntimeException("Failed to copy template to: {$fullPath}");
+            }
+
+            Log::info("Course image generated successfully: {$relativePath}");
+            return $relativePath;
+
         } catch (\Exception $e) {
             Log::warning("Failed to draw text '{$text}': " . $e->getMessage());
             // رسم احتياطي بدون تأثيرات
@@ -468,8 +206,8 @@ class CourseImageGenerator
                 $font->align('center');
                 $font->valign('center');
             });
+            Log::error('Course image generation failed: ' . $e->getMessage());
+            throw new \RuntimeException('Course image generation failed: ' . $e->getMessage());
         }
-
-        return $this->saveImage($img);
     }
 }

@@ -43,3 +43,42 @@ class DeactivateExpiredSubscriptions extends Command
         return 0;
     }
 }
+<?php
+
+namespace App\Console\Commands;
+
+use Illuminate\Console\Command;
+use App\Models\Subscription;
+use Illuminate\Support\Facades\Log;
+
+class DeactivateExpiredSubscriptions extends Command
+{
+    protected $signature = 'subscriptions:deactivate-expired';
+    protected $description = 'Deactivate expired subscriptions';
+
+    public function handle()
+    {
+        $expiredSubscriptions = Subscription::where('status', 'approved')
+            ->where('expires_at', '<', now())
+            ->where('is_active', true)
+            ->get();
+
+        $count = 0;
+        foreach ($expiredSubscriptions as $subscription) {
+            $subscription->update(['is_active' => false]);
+            $count++;
+            
+            Log::info("Deactivated expired subscription", [
+                'subscription_id' => $subscription->id,
+                'user_id' => $subscription->user_id,
+                'course_id' => $subscription->course_id,
+                'expired_at' => $subscription->expires_at
+            ]);
+        }
+
+        $this->info("Deactivated {$count} expired subscriptions.");
+        Log::info("Deactivated {$count} expired subscriptions via command.");
+
+        return 0;
+    }
+}

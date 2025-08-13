@@ -12,16 +12,13 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // تعطيل الاشتراكات المنتهية الصلاحية كل ساعة
-        $schedule->command('subscriptions:deactivate-expired')
-                 ->hourly()
-                 ->withoutOverlapping()
-                 ->runInBackground();
+        // $schedule->command('inspire')->hourly();
 
-        // إرسال تذكير للاشتراكات التي ستنتهي قريباً (كل يوم في الساعة 9 صباحاً)
-        $schedule->command('subscriptions:send-expiry-reminders')
-                 ->dailyAt('09:00')
-                 ->withoutOverlapping();
+        // Deactivate expired subscriptions every hour
+        $schedule->command('subscriptions:deactivate-expired')->hourly();
+
+        // Send expiry reminders daily
+        $schedule->command('subscriptions:send-expiry-reminders')->dailyAt('09:00');
     }
 
     /**

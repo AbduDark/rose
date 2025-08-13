@@ -1,528 +1,0 @@
-
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>خارطة الطريق الكاملة - منصة التعلم</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            margin: 0;
-            padding: 20px;
-            background: #f8f9fa;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 0 20px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #2c3e50;
-            text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 3px solid #3498db;
-            padding-bottom: 10px;
-        }
-        h2 {
-            color: #34495e;
-            background: #ecf0f1;
-            padding: 10px;
-            border-left: 5px solid #3498db;
-            margin-top: 30px;
-        }
-        h3 {
-            color: #2980b9;
-            margin-top: 20px;
-        }
-        .section {
-            margin-bottom: 30px;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-        }
-        .file-structure {
-            background: #2d3748;
-            color: #e2e8f0;
-            padding: 15px;
-            border-radius: 5px;
-            font-family: monospace;
-            overflow-x: auto;
-        }
-        .endpoint {
-            background: #f8f9fa;
-            padding: 10px;
-            margin: 5px 0;
-            border-left: 4px solid #28a745;
-            border-radius: 4px;
-        }
-        .method-get { border-left-color: #28a745; }
-        .method-post { border-left-color: #007bff; }
-        .method-put { border-left-color: #ffc107; }
-        .method-delete { border-left-color: #dc3545; }
-        .badge {
-            padding: 3px 8px;
-            border-radius: 3px;
-            color: white;
-            font-size: 12px;
-            font-weight: bold;
-        }
-        .badge-get { background: #28a745; }
-        .badge-post { background: #007bff; }
-        .badge-put { background: #ffc107; }
-        .badge-delete { background: #dc3545; }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 10px 0;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: right;
-        }
-        th {
-            background: #f2f2f2;
-        }
-        .print-btn {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            background: #3498db;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            z-index: 1000;
-        }
-        @media print {
-            .print-btn { display: none; }
-            body { background: white; }
-            .container { box-shadow: none; }
-        }
-    </style>
-</head>
-<body>
-    <button class="print-btn" onclick="window.print()">طباعة PDF</button>
-    
-    <div class="container">
-        <h1>خارطة الطريق الكاملة - منصة التعلم الإلكتروني</h1>
-        
-        <div class="section">
-            <h2>📋 نظرة عامة على المشروع</h2>
-            <p><strong>نوع المشروع:</strong> منصة تعلم إلكتروني باستخدام Laravel API</p>
-            <p><strong>قاعدة البيانات:</strong> SQLite</p>
-            <p><strong>المصادقة:</strong> Laravel Sanctum</p>
-            <p><strong>الميزات الرئيسية:</strong></p>
-            <ul>
-                <li>نظام المصادقة والتسجيل</li>
-                <li>إدارة الدورات والدروس</li>
-                <li>نظام الاشتراكات والمدفوعات</li>
-                <li>نظام التقييمات والتعليقات</li>
-                <li>نظام المفضلة</li>
-                <li>لوحة تحكم المشرف</li>
-            </ul>
-        </div>
-
-        <div class="section">
-            <h2>🏗️ هيكل المشروع</h2>
-            <div class="file-structure">
-app/
-├── Http/
-│   ├── Controllers/Api/          # كونترولرز API
-│   │   ├── AuthController.php    # المصادقة والتسجيل
-│   │   ├── CourseController.php  # إدارة الدورات
-│   │   ├── LessonController.php  # إدارة الدروس
-│   │   ├── UserController.php    # إدارة المستخدمين
-│   │   ├── PaymentController.php # إدارة المدفوعات
-│   │   └── ...
-│   ├── Middleware/               # الوسطاء
-│   └── Resources/               # موارد API
-├── Models/                      # نماذج قاعدة البيانات
-│   ├── User.php
-│   ├── Course.php
-│   ├── Lesson.php
-│   └── ...
-└── Mail/                       # قوالب البريد الإلكتروني
-
-database/
-├── migrations/                 # ملفات الهجرة
-├── seeders/                   # ملفات البذور
-└── database.sqlite           # قاعدة البيانات
-
-routes/
-├── api.php                   # مسارات API
-└── web.php                   # مسارات الويب
-
-resources/
-├── views/                    # قوالب العرض
-└── lang/                     # ملفات الترجمة
-            </div>
-        </div>
-
-        <div class="section">
-            <h2>🔐 نقاط النهاية - المصادقة</h2>
-            
-            <div class="endpoint method-post">
-                <h3><span class="badge badge-post">POST</span> /api/auth/register</h3>
-                <p><strong>الوصف:</strong> تسجيل مستخدم جديد</p>
-                <p><strong>المعاملات:</strong> name, email, password, phone, gender</p>
-                <p><strong>الملف:</strong> app/Http/Controllers/Api/AuthController.php - دالة register</p>
-            </div>
-
-            <div class="endpoint method-post">
-                <h3><span class="badge badge-post">POST</span> /api/auth/login</h3>
-                <p><strong>الوصف:</strong> تسجيل دخول المستخدم</p>
-                <p><strong>المعاملات:</strong> email, password</p>
-                <p><strong>الملف:</strong> app/Http/Controllers/Api/AuthController.php - دالة login</p>
-            </div>
-
-            <div class="endpoint method-post">
-                <h3><span class="badge badge-post">POST</span> /api/auth/logout</h3>
-                <p><strong>الوصف:</strong> تسجيل خروج المستخدم</p>
-                <p><strong>المتطلبات:</strong> التوكن</p>
-                <p><strong>الملف:</strong> app/Http/Controllers/Api/AuthController.php - دالة logout</p>
-            </div>
-
-            <div class="endpoint method-get">
-                <h3><span class="badge badge-get">GET</span> /api/auth/profile</h3>
-                <p><strong>الوصف:</strong> عرض بيانات المستخدم</p>
-                <p><strong>المتطلبات:</strong> التوكن</p>
-                <p><strong>الملف:</strong> app/Http/Controllers/Api/AuthController.php - دالة profile</p>
-            </div>
-        </div>
-
-        <div class="section">
-            <h2>📚 نقاط النهاية - الدورات</h2>
-            
-            <div class="endpoint method-get">
-                <h3><span class="badge badge-get">GET</span> /api/courses</h3>
-                <p><strong>الوصف:</strong> عرض جميع الدورات (عام)</p>
-                <p><strong>الملف:</strong> app/Http/Controllers/Api/CourseController.php - دالة index</p>
-            </div>
-
-            <div class="endpoint method-get">
-                <h3><span class="badge badge-get">GET</span> /api/courses/{id}</h3>
-                <p><strong>الوصف:</strong> عرض تفاصيل دورة معينة</p>
-                <p><strong>الملف:</strong> app/Http/Controllers/Api/CourseController.php - دالة show</p>
-            </div>
-
-            <div class="endpoint method-post">
-                <h3><span class="badge badge-post">POST</span> /api/courses (مشرف فقط)</h3>
-                <p><strong>الوصف:</strong> إنشاء دورة جديدة</p>
-                <p><strong>المعاملات:</strong> title, description, price, image</p>
-                <p><strong>الملف:</strong> app/Http/Controllers/Api/CourseController.php - دالة store</p>
-            </div>
-
-            <div class="endpoint method-put">
-                <h3><span class="badge badge-put">PUT</span> /api/courses/{id} (مشرف فقط)</h3>
-                <p><strong>الوصف:</strong> تحديث دورة</p>
-                <p><strong>الملف:</strong> app/Http/Controllers/Api/CourseController.php - دالة update</p>
-            </div>
-
-            <div class="endpoint method-delete">
-                <h3><span class="badge badge-delete">DELETE</span> /api/courses/{id} (مشرف فقط)</h3>
-                <p><strong>الوصف:</strong> حذف دورة</p>
-                <p><strong>الملف:</strong> app/Http/Controllers/Api/CourseController.php - دالة destroy</p>
-            </div>
-        </div>
-
-        <div class="section">
-            <h2>📖 نقاط النهاية - الدروس</h2>
-            
-            <div class="endpoint method-get">
-                <h3><span class="badge badge-get">GET</span> /api/courses/{id}/lessons</h3>
-                <p><strong>الوصف:</strong> عرض دروس دورة معينة</p>
-                <p><strong>المتطلبات:</strong> التوكن + الاشتراك</p>
-                <p><strong>الملف:</strong> app/Http/Controllers/Api/LessonController.php - دالة index</p>
-            </div>
-
-            <div class="endpoint method-post">
-                <h3><span class="badge badge-post">POST</span> /api/lessons (مشرف فقط)</h3>
-                <p><strong>الوصف:</strong> إنشاء درس جديد</p>
-                <p><strong>المعاملات:</strong> course_id, title, content, video_url</p>
-                <p><strong>الملف:</strong> app/Http/Controllers/Api/LessonController.php - دالة store</p>
-            </div>
-        </div>
-
-        <div class="section">
-            <h2>💳 نقاط النهاية - الاشتراكات والمدفوعات</h2>
-            
-            <div class="endpoint method-get">
-                <h3><span class="badge badge-get">GET</span> /api/my-subscriptions</h3>
-                <p><strong>الوصف:</strong> عرض اشتراكات المستخدم</p>
-                <p><strong>الملف:</strong> app/Http/Controllers/Api/SubscriptionController.php - دالة mySubscriptions</p>
-            </div>
-
-            <div class="endpoint method-post">
-                <h3><span class="badge badge-post">POST</span> /api/subscribe</h3>
-                <p><strong>الوصف:</strong> الاشتراك في دورة</p>
-                <p><strong>المعاملات:</strong> course_id</p>
-                <p><strong>الملف:</strong> app/Http/Controllers/Api/SubscriptionController.php - دالة subscribe</p>
-            </div>
-
-            <div class="endpoint method-post">
-                <h3><span class="badge badge-post">POST</span> /api/payments/vodafone</h3>
-                <p><strong>الوصف:</strong> إرسال طلب دفع فودافون</p>
-                <p><strong>المعاملات:</strong> course_id, phone, amount</p>
-                <p><strong>الملف:</strong> app/Http/Controllers/Api/PaymentController.php - دالة store</p>
-            </div>
-        </div>
-
-        <div class="section">
-            <h2>⭐ نقاط النهاية - التقييمات والتعليقات</h2>
-            
-            <div class="endpoint method-post">
-                <h3><span class="badge badge-post">POST</span> /api/ratings</h3>
-                <p><strong>الوصف:</strong> إضافة تقييم لدورة</p>
-                <p><strong>المعاملات:</strong> course_id, rating, comment</p>
-                <p><strong>الملف:</strong> app/Http/Controllers/Api/RatingController.php - دالة store</p>
-            </div>
-
-            <div class="endpoint method-post">
-                <h3><span class="badge badge-post">POST</span> /api/comments</h3>
-                <p><strong>الوصف:</strong> إضافة تعليق على درس</p>
-                <p><strong>المعاملات:</strong> lesson_id, comment</p>
-                <p><strong>الملف:</strong> app/Http/Controllers/Api/CommentController.php - دالة store</p>
-            </div>
-
-            <div class="endpoint method-post">
-                <h3><span class="badge badge-post">POST</span> /api/favorite/{course_id}</h3>
-                <p><strong>الوصف:</strong> إضافة دورة للمفضلة</p>
-                <p><strong>الملف:</strong> app/Http/Controllers/Api/FavoriteController.php - دالة add</p>
-            </div>
-        </div>
-
-        <div class="section">
-            <h2>👨‍💼 نقاط النهاية - لوحة تحكم المشرف</h2>
-            
-            <div class="endpoint method-get">
-                <h3><span class="badge badge-get">GET</span> /api/admin/users</h3>
-                <p><strong>الوصف:</strong> عرض جميع المستخدمين</p>
-                <p><strong>الملف:</strong> app/Http/Controllers/Api/UserController.php - دالة index</p>
-            </div>
-
-            <div class="endpoint method-get">
-                <h3><span class="badge badge-get">GET</span> /api/admin/payments/pending</h3>
-                <p><strong>الوصف:</strong> عرض المدفوعات المعلقة</p>
-                <p><strong>الملف:</strong> app/Http/Controllers/Api/PaymentController.php - دالة pending</p>
-            </div>
-
-            <div class="endpoint method-post">
-                <h3><span class="badge badge-post">POST</span> /api/admin/payments/accept/{id}</h3>
-                <p><strong>الوصف:</strong> قبول دفعة</p>
-                <p><strong>الملف:</strong> app/Http/Controllers/Api/PaymentController.php - دالة accept</p>
-            </div>
-        </div>
-
-        <div class="section">
-            <h2>🗃️ نماذج قاعدة البيانات</h2>
-            
-            <table>
-                <tr>
-                    <th>النموذج</th>
-                    <th>الملف</th>
-                    <th>الجداول المرتبطة</th>
-                    <th>الوصف</th>
-                </tr>
-                <tr>
-                    <td>User</td>
-                    <td>app/Models/User.php</td>
-                    <td>subscriptions, favorites, ratings</td>
-                    <td>بيانات المستخدمين</td>
-                </tr>
-                <tr>
-                    <td>Course</td>
-                    <td>app/Models/Course.php</td>
-                    <td>lessons, subscriptions, ratings</td>
-                    <td>بيانات الدورات</td>
-                </tr>
-                <tr>
-                    <td>Lesson</td>
-                    <td>app/Models/Lesson.php</td>
-                    <td>courses, comments</td>
-                    <td>دروس الدورات</td>
-                </tr>
-                <tr>
-                    <td>Subscription</td>
-                    <td>app/Models/Subscription.php</td>
-                    <td>users, courses</td>
-                    <td>اشتراكات المستخدمين</td>
-                </tr>
-                <tr>
-                    <td>Payment</td>
-                    <td>app/Models/Payment.php</td>
-                    <td>users, courses</td>
-                    <td>معاملات الدفع</td>
-                </tr>
-                <tr>
-                    <td>Rating</td>
-                    <td>app/Models/Rating.php</td>
-                    <td>users, courses</td>
-                    <td>تقييمات الدورات</td>
-                </tr>
-                <tr>
-                    <td>Comment</td>
-                    <td>app/Models/Comment.php</td>
-                    <td>users, lessons</td>
-                    <td>تعليقات الدروس</td>
-                </tr>
-                <tr>
-                    <td>Favorite</td>
-                    <td>app/Models/Favorite.php</td>
-                    <td>users, courses</td>
-                    <td>المفضلة</td>
-                </tr>
-            </table>
-        </div>
-
-        <div class="section">
-            <h2>🔧 الوسطاء (Middleware)</h2>
-            
-            <table>
-                <tr>
-                    <th>الوسيط</th>
-                    <th>الملف</th>
-                    <th>الوصف</th>
-                </tr>
-                <tr>
-                    <td>AdminMiddleware</td>
-                    <td>app/Http/Middleware/AdminMiddleware.php</td>
-                    <td>التحقق من صلاحيات المشرف</td>
-                </tr>
-                <tr>
-                    <td>CheckSessionMiddleware</td>
-                    <td>app/Http/Middleware/CheckSessionMiddleware.php</td>
-                    <td>التحقق من صحة الجلسة</td>
-                </tr>
-                <tr>
-                    <td>RoleMiddleware</td>
-                    <td>app/Http/Middleware/RoleMiddleware.php</td>
-                    <td>التحقق من الأدوار</td>
-                </tr>
-                <tr>
-                    <td>CheckSubscription</td>
-                    <td>app/Http/Middleware/CheckSubscription.php</td>
-                    <td>التحقق من الاشتراك</td>
-                </tr>
-            </table>
-        </div>
-
-        <div class="section">
-            <h2>📁 ملفات مهمة للتعديل</h2>
-            
-            <h3>🔧 ملفات التكوين</h3>
-            <ul>
-                <li><strong>config/app.php</strong> - إعدادات التطبيق العامة</li>
-                <li><strong>config/database.php</strong> - إعدادات قاعدة البيانات</li>
-                <li><strong>config/sanctum.php</strong> - إعدادات التوكن</li>
-                <li><strong>config/mail.php</strong> - إعدادات البريد الإلكتروني</li>
-            </ul>
-
-            <h3>🛣️ ملفات المسارات</h3>
-            <ul>
-                <li><strong>routes/api.php</strong> - جميع مسارات API</li>
-                <li><strong>routes/web.php</strong> - مسارات الويب</li>
-            </ul>
-
-            <h3>🎨 ملفات العرض</h3>
-            <ul>
-                <li><strong>resources/views/documentation.blade.php</strong> - صفحة توثيق API</li>
-                <li><strong>resources/views/welcome.blade.php</strong> - الصفحة الرئيسية</li>
-            </ul>
-
-            <h3>🌐 ملفات الترجمة</h3>
-            <ul>
-                <li><strong>resources/lang/ar/messages.php</strong> - الرسائل بالعربية</li>
-                <li><strong>resources/lang/en/messages.php</strong> - الرسائل بالإنجليزية</li>
-            </ul>
-        </div>
-
-        <div class="section">
-            <h2>⚙️ كيفية التشغيل والصيانة</h2>
-            
-            <h3>تشغيل المشروع:</h3>
-            <div class="file-structure">
-# تشغيل كامل من البداية
-php artisan config:clear
-php artisan route:clear
-php artisan cache:clear
-php artisan key:generate --force
-php artisan migrate:fresh --seed --force
-php artisan serve --host=0.0.0.0 --port=8000
-            </div>
-
-            <h3>أوامر مفيدة:</h3>
-            <div class="file-structure">
-# إنشاء كونترولر جديد
-php artisan make:controller Api/NewController
-
-# إنشاء نموذج جديد مع الهجرة
-php artisan make:model NewModel -m
-
-# إنشاء وسيط جديد
-php artisan make:middleware NewMiddleware
-
-# تشغيل الهجرات
-php artisan migrate
-
-# إعادة تحميل البيانات
-php artisan db:seed
-            </div>
-        </div>
-
-        <div class="section">
-            <h2>🔍 نصائح للتعديل والتطوير</h2>
-            
-            <h3>إضافة ميزة جديدة:</h3>
-            <ol>
-                <li>إنشاء النموذج والهجرة في <code>app/Models/</code></li>
-                <li>إنشاء الكونترولر في <code>app/Http/Controllers/Api/</code></li>
-                <li>إضافة المسارات في <code>routes/api.php</code></li>
-                <li>إضافة الوسطاء إذا لزم الأمر</li>
-                <li>تحديث توثيق API في <code>resources/views/documentation.blade.php</code></li>
-            </ol>
-
-            <h3>تعديل واجهة المستخدم:</h3>
-            <ul>
-                <li>ملفات العرض في <code>resources/views/</code></li>
-                <li>ملفات CSS في <code>resources/css/</code></li>
-                <li>ملفات JavaScript في <code>resources/js/</code></li>
-            </ul>
-
-            <h3>تعديل قاعدة البيانات:</h3>
-            <ul>
-                <li>إنشاء هجرة جديدة: <code>php artisan make:migration</code></li>
-                <li>تعديل النماذج في <code>app/Models/</code></li>
-                <li>تحديث البذور في <code>database/seeders/</code></li>
-            </ul>
-        </div>
-
-        <div class="section">
-            <h2>📱 روابط مهمة</h2>
-            <ul>
-                <li><strong>الصفحة الرئيسية:</strong> <code>/</code></li>
-                <li><strong>توثيق API:</strong> <code>/docs</code> أو <code>/api-docs</code></li>
-                <li><strong>نقطة النهاية الأساسية للAPI:</strong> <code>/api</code></li>
-                <li><strong>خارطة الطريق:</strong> <code>/roadmap.html</code></li>
-            </ul>
-        </div>
-
-        <div class="section">
-            <h2>📝 ملاحظات مهمة</h2>
-            <ul>
-                <li>جميع مسارات API تتطلب <code>Accept: application/json</code></li>
-                <li>المسارات المحمية تتطلب <code>Authorization: Bearer {token}</code></li>
-                <li>مسارات المشرف تتطلب <code>role:admin</code></li>
-                <li>ملف البيئة <code>.env</code> يحتوي على إعدادات قاعدة البيانات والبريد</li>
-                <li>استخدم Postman أو أي أداة API لاختبار النقاط</li>
-            </ul>
-        </div>
-    </div>
-</body>
-</html>
