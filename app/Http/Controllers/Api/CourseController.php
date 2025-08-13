@@ -226,7 +226,7 @@ class CourseController extends BaseController
             $generatedImagePath = $imageGenerator->generateCourseImage([
             'title' => $request->title,
             'price' => floatval($request->price),
-            'description' => $request-  >description,
+            'description' => $request->description,
             'grade' => $request->grade
             ]);
 
