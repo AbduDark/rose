@@ -279,7 +279,7 @@ class AuthController extends Controller
             return response()->json($request->user());
         }
 
-        
+
     }
 
    public function logout(Request $request)
@@ -453,7 +453,6 @@ class AuthController extends Controller
         // Handle image upload
 
        if ($request->hasFile('image')) {
-        dd($request->file('image'));
     $image = $request->file('image');
 
     // حذف الصورة القديمة إذا كانت موجودة
