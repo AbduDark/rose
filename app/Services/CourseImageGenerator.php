@@ -86,7 +86,7 @@ class CourseImageGenerator
             ],
         ];
 
-        $this->defaultFont = public_path('fonts/Cairo-Regular.ttf');
+        $this->defaultFont = public_path('fonts/NotoSansArabic-Regular.ttf');
     }
 
     /**
@@ -102,7 +102,10 @@ class CourseImageGenerator
             throw new \InvalidArgumentException('Title is required for course image generation');
         }
 
+        // اختيار تميبليت عشوائي
         $tpl = $this->templates[array_rand($this->templates)];
+        
+        Log::info("Selected template: {$tpl['id']} for course: {$data['title']}");
 
         if (!file_exists($tpl['file'])) {
             Log::warning("Template file not found: {$tpl['file']}");
@@ -112,6 +115,8 @@ class CourseImageGenerator
         try {
             $img = Image::make($tpl['file']);
             $fontPath = file_exists($this->defaultFont) ? $this->defaultFont : null;
+            
+            Log::info("Using font: " . ($fontPath ? $fontPath : 'system default'));
 
             $this->addTextElements($img, $tpl, $data, $fontPath);
 
@@ -119,9 +124,13 @@ class CourseImageGenerator
                 $this->addLogo($img, $data['logo_path'], $tpl['positions']['logo']);
             }
 
-            return $this->saveImage($img);
+            $imagePath = $this->saveImage($img);
+            Log::info("Course image generated successfully: {$imagePath}");
+            
+            return $imagePath;
         } catch (\Exception $e) {
             Log::error('Course image generation failed: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
             return $this->createFallbackImage($data);
         }
     }
@@ -215,16 +224,29 @@ class CourseImageGenerator
 
     private function drawTextBox($img, string $text, int $x, int $y, int $boxWidth, ?string $fontPath, int $fontSize, string $hexColor, string $align = 'left'): void
     {
-        $lines = $this->wrapTextToLines($text, $fontPath, $fontSize, $boxWidth);
-        $lineHeight = (int)($fontSize * 1.25);
-        $startX = $this->computeX($img->width(), $x, $align, null);
+        try {
+            $lines = $this->wrapTextToLines($text, $fontPath, $fontSize, $boxWidth);
+            $lineHeight = (int)($fontSize * 1.25);
+            $startX = $this->computeX($img->width(), $x, $align, null);
 
-        foreach ($lines as $i => $line) {
-            $lineY = $y + ($i * $lineHeight);
-            $img->text($line, $startX, $lineY, function ($font) use ($fontPath, $fontSize, $hexColor, $align) {
-                if ($fontPath) {
-                    $font->file($fontPath);
-                }
+            Log::info("Drawing text: {$text} at position ({$startX}, {$y}) with {$fontSize}px font");
+
+            foreach ($lines as $i => $line) {
+                $lineY = $y + ($i * $lineHeight);
+                $img->text($line, $startX, $lineY, function ($font) use ($fontPath, $fontSize, $hexColor, $align) {
+                    if ($fontPath && file_exists($fontPath)) {
+                        $font->file($fontPath);
+                    }
+                    $font->size($fontSize);
+                    $font->color($hexColor);
+                    $font->align($align);
+                    $font->valign('top');
+                });
+            }
+        } catch (\Exception $e) {
+            Log::warning("Failed to draw text '{$text}': " . $e->getMessage());
+            // رسم النص بدون خط مخصص كـ fallback
+            $img->text($text, $x, $y, function ($font) use ($fontSize, $hexColor, $align) {
                 $font->size($fontSize);
                 $font->color($hexColor);
                 $font->align($align);
