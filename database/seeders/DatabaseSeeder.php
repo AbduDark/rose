@@ -158,19 +158,21 @@ class DatabaseSeeder extends Seeder
         }
         // داتا فيك للتعليقات
         foreach (User::all() as $user) {
-            foreach (Lesson::all()->random(1) as $lesson) {
-                Comment::create([
-                    'user_id' => $user->id,
-                    'lesson_id' => $lesson->id,
-                    'content' => 'تعليق تجريبي',
-                    'is_approved' => true
-                ]);
-            }
-        }
+    foreach (Lesson::all()->random(1) as $lesson) {
+        Comment::create([
+            'user_id' => $user->id,
+            'lesson_id' => $lesson->id,
+            'course_id' => $lesson->course_id, // أضف هذا السطر
+            'content' => 'تعليق تجريبي',
+            'is_approved' => true
+        ]);
+    }
+}
 
         $this->call([
             LargeCourseSeeder::class,
             NotificationSeeder::class,
+            UpdateCommentsSeeder::class,
         ]);
     }
 }
