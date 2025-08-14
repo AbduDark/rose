@@ -15,9 +15,6 @@ return new class extends Migration
         });
 
         // Add target_gender to lessons
-        Schema::table('lessons', function (Blueprint $table) {
-            $table->enum('target_gender', ['male', 'female', 'both'])->default('both');
-        });
 
         // Update subscriptions to include expiry and admin approval
         Schema::table('subscriptions', function (Blueprint $table) {

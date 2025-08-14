@@ -148,3 +148,35 @@ Route::middleware(['auth:sanctum', AdminMiddleware::class])
     Route::post('notifications/send',         [NotificationController::class, 'sendNotification']);
     Route::get('notifications/statistics',    [NotificationController::class, 'statistics']);
 });
+Route::middleware(['auth:sanctum'])->group(function () {
+    // Lesson Video Routes
+    Route::prefix('lessons/{lesson}')->group(function () {
+        Route::get('playlist', [LessonVideoController::class, 'getPlaylist'])
+            ->name('lesson.playlist');
+        Route::get('key', [LessonVideoController::class, 'getKey'])
+            ->name('lesson.key');
+        Route::get('status', [LessonVideoController::class, 'getProcessingStatus'])
+            ->name('lesson.status');
+    });
+
+    // Segment access with token validation
+    Route::get('segments/{lessonId}/{segment}', [LessonVideoController::class, 'getSegment'])
+        ->name('lesson.segment')
+        ->where('segment', '[a-zA-Z0-9_.-]+\.ts');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Admin Video Management Routes
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth:sanctum', AdminMiddleware::class])
+    ->prefix('admin/lessons')
+    ->group(function () {
+        Route::post('{lesson}/video/upload', [LessonVideoController::class, 'upload'])
+            ->name('admin.lesson.video.upload');
+        Route::delete('{lesson}/video', [LessonVideoController::class, 'deleteVideo'])
+            ->name('admin.lesson.video.delete');
+        Route::get('{lesson}/video/status', [LessonVideoController::class, 'getProcessingStatus'])
+            ->name('admin.lesson.video.status');
+    });
