@@ -25,6 +25,7 @@ use App\Mail\PasswordResetMail;
 
 class AuthController extends Controller
 {
+
     public function getAvatar($filename)
 {
     $path = public_path('avatars/' . $filename);
@@ -422,83 +423,58 @@ class AuthController extends Controller
         }
     }
 
- public function updateProfile(Request $request)
-{
-    try {
-        $user = $request->user();
+       public function update(Request $request)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
 
-        if (!$user) {
-            return $this->errorResponse([
-                'ar' => 'المستخدم غير موجود',
-                'en' => 'User not found'
-            ], 404);
-        }
-
+        // التحقق من البيانات
         $validator = Validator::make($request->all(), [
-            'name'  => 'nullable|string|max:255',
-            'phone' => 'nullable|string|max:20|unique:users,phone,' . $user->id,
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'name'   => 'required|string|max:255',
+            'phone'  => 'nullable|string|max:20',
+            'image'  => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         if ($validator->fails()) {
-            return $this->validationErrorResponse(new ValidationException($validator));
+            return response()->json([
+                'success' => false,
+                'errors'  => $validator->errors()
+            ], 422);
         }
 
-        // Prepare update data
-        $updateData = array_filter([
-            'name'  => $request->name,
-            'phone' => $request->phone,
+        // تحديث البيانات
+        $user->name = $request->name;
+        $user->phone = $request->phone;
+
+        // رفع الصورة إذا وجدت
+        if ($request->hasFile('image')) {
+            // حذف الصورة القديمة إذا موجودة
+            if ($user->image && file_exists(public_path($user->image))) {
+                @unlink(public_path($user->image));
+            }
+
+            $file = $request->file('image');
+            $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+            $file->move(public_path('uploads/avatars'), $filename);
+
+            // تخزين المسار في قاعدة البيانات
+            $user->image = 'uploads/avatars/' . $filename;
+        }
+
+        $user->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم تحديث البروفايل بنجاح',
+            'data'    => [
+                'id'     => $user->id,
+                'name'   => $user->name,
+                'phone'  => $user->phone,
+                'image'  => $user->image ? asset($user->image) : null,
+            ]
         ]);
-
-        // Handle image upload
-
-       if ($request->hasFile('image')) {
-        $image = $request->file('image');
-
-        // حذف الصورة القديمة إذا كانت موجودة
-        if ($user->image && file_exists(public_path($user->image))) {
-            @unlink(public_path($user->image));
-        }
-
-        // اسم الملف الجديد
-        $imageName = uniqid('avatar_') . '.' . $image->getClientOriginalExtension();
-        $uploadPath = public_path('uploads/avatars');
-
-        // إنشاء المجلد إذا لم يكن موجود
-        if (!file_exists($uploadPath)) {
-            mkdir($uploadPath, 0755, true);
-        }
-
-        // نقل الصورة
-            $image->move($uploadPath, $imageName);
-            $updateData['image'] = 'uploads/avatars/' . $imageName;
-        }
-
-        // Only update if there's data to update
-        if (!empty($updateData)) {
-            $user->update($updateData);
-        }
-
-        // تجهيز بيانات الاستجابة مع رابط الصورة
-        $userData = $user->only(['id', 'name', 'email', 'phone', 'gender', 'role']);
-        if ($user->image) {
-            $userData['image'] = $user->image;
-            $userData['image_url'] = url($user->image);
-        }
-
-        return $this->successResponse([
-            'user' => $userData,
-            'updated_fields' => array_keys($updateData)
-        ], [
-            'ar' => 'تم تحديث الملف الشخصي بنجاح',
-            'en' => 'Profile updated successfully'
-        ]);
-
-    } catch (\Exception $e) {
-        Log::error('Profile update error: ' . $e->getMessage());
-        return $this->serverErrorResponse();
     }
-}
+
 
 
 

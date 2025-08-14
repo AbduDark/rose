@@ -170,74 +170,47 @@ class CourseController extends BaseController
         }
     }
 
-    public function store(Request $request)
-    {
-        try {
-            // التحقق من أن المستخدم أدمن
-            if (!$request->user() || !$request->user()->isAdmin()) {
-                return $this->errorResponse([
-                    'ar' => 'غير مصرح لك بإضافة كورس',
-                    'en' => 'Unauthorized to create course'
-                ], 403);
-            }
+   public function store(Request $request)
+{
+    try {
+        if (!$request->user() || !$request->user()->isAdmin()) {
+            return $this->errorResponse([
+                'ar' => 'غير مصرح لك بإضافة كورس',
+                'en' => 'Unauthorized to create course'
+            ], 403);
+        }
 
-            $validator = Validator::make($request->all(), [
-                'title' => 'required|string|max:255|unique:courses',
-                'description' => 'required|string',
-                'price' => 'required|numeric|min:0',
-                'level' => 'required|in:beginner,intermediate,advanced',
-                'duration_hours' => 'nullable|integer|min:0',
-                'requirements' => 'nullable|string',
-                'instructor_name' => 'nullable|string|max:255',
-                'language' => 'nullable|string|max:10',
-                'grade' => 'required|in:الاول,الثاني,الثالث',
-                'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-            ], [
-                'title.required' => 'العنوان مطلوب|Title is required',
-                'title.unique' => 'العنوان موجود بالفعل|Title already exists',
-                'description.required' => 'الوصف مطلوب|Description is required',
-                'price.required' => 'السعر مطلوب|Price is required',
-                'price.numeric' => 'السعر يجب أن يكون رقم|Price must be numeric',
-                'level.required' => 'المستوى مطلوب|Level is required',
-                'level.in' => 'المستوى يجب أن يكون beginner أو intermediate أو advanced|Invalid level',
-                'grade.required' => 'الصف الدراسي مطلوب|Grade is required',
-                'grade.in' => 'الصف الدراسي يجب أن يكون الاول أو الثاني أو الثالث|Invalid grade',
-                'image.image' => 'الملف يجب أن يكون صورة|File must be an image',
-                'image.mimes' => 'الصورة يجب أن تكون jpeg أو png أو jpg|Image must be jpeg, png or jpg',
-                'image.max' => 'حجم الصورة يجب ألا يزيد عن 2 ميجابايت|Image size must not exceed 2MB'
-            ]);
+        $validator = Validator::make($request->all(), [
+            'title' => 'required|string|max:255|unique:courses',
+            'description' => 'required|string',
+            'price' => 'required|numeric|min:0',
+            'level' => 'nullable|in:beginner,intermediate,advanced',
+            'duration_hours' => 'nullable|integer|min:0',
+            'requirements' => 'nullable|string',
+            'instructor_name' => 'nullable|string|max:255',
+            'language' => 'nullable|string|max:10',
+            'grade' => 'required|in:الاول,الثاني,الثالث',
+            'image' => 'required|image|mimes:jpeg,png,jpg|max:2048', // خليتها required
+        ]);
 
-            if ($validator->fails()) {
-                return $this->validationErrorResponse(new ValidationException($validator));
-            }
+        if ($validator->fails()) {
+            return $this->validationErrorResponse(new ValidationException($validator));
+        }
 
-     $data = $request->except('image');
+        $data = $request->except('image');
         $data['language'] = $data['language'] ?? 'ar';
-        $data['instructor_name'] = $data['instructor_name'] ?? 'أكاديمية روز';
+        $data['instructor_name'] = $data['instructor_name'] ?? 'أ.روز';
 
+        // رفع الصورة
         if ($request->hasFile('image')) {
             $image = $request->file('image');
-            $filename = time() . '_' . $image->getClientOriginalName();
-            $relativePath = 'uploads/courses/' . $filename;
+            $filename = time() . '_' . uniqid() . '.' . $image->getClientOriginalExtension();
             $image->move(public_path('uploads/courses'), $filename);
-            $data['image'] = $relativePath;
-        } else {
-            $imageGenerator = new CourseImageGenerator();
-            $generatedImagePath = $imageGenerator->generateCourseImage([
-            'title' => $request->title,
-            'price' => floatval($request->price),
-            'description' => $request->description,
-            'grade' => $request->grade
-            ]);
-
-            $data['image'] = $generatedImagePath;
+            $data['image'] = 'uploads/courses/' . $filename; // نخزن المسار في قاعدة البيانات
         }
 
         $course = Course::create($data);
         Cache::forget('courses_' . md5(''));
-
-        // إنشاء URL كامل للصورة
-        $course->image_url = url($course->image);
 
         return $this->successResponse(
             new CourseResource($course),
@@ -247,86 +220,92 @@ class CourseController extends BaseController
             ],
             201
         );
-        } catch (\Exception $e) {
-            Log::error('Course creation error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'request' => $request->except('image')
-            ]);
-            return $this->serverErrorResponse();
-        }
+    } catch (\Exception $e) {
+        Log::error('Course creation error', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+            'request' => $request->except('image')
+        ]);
+        return $this->serverErrorResponse();
     }
+}
 
-    public function update(Request $request, $id)
-    {
-        try {
-            $course = Course::findOrFail($id);
 
-            if (!$request->user() || !$request->user()->isAdmin()) {
-                return $this->errorResponse([
-                    'ar' => 'غير مصرح لك بتعديل هذا الكورس',
-                    'en' => 'Unauthorized to update this course'
-                ], 403);
+public function update(Request $request, $id)
+{
+    try {
+        $course = Course::findOrFail($id);
+
+        $validated = $request->validate([
+            'title' => 'sometimes|required|string|max:255|unique:courses,title,' . $id,
+            'description' => 'sometimes|required|string',
+            'price' => 'sometimes|required|numeric|min:0',
+            'level' => 'nullable|in:beginner,intermediate,advanced',
+            'duration_hours' => 'nullable|integer|min:0',
+            'requirements' => 'nullable|string',
+            'instructor_name' => 'nullable|string|max:255',
+            'language' => 'nullable|string|max:10',
+            'grade' => 'sometimes|required|in:الاول,الثاني,الثالث',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+        ]);
+
+        $data = $validated;
+
+        if ($request->hasFile('image')) {
+            if ($course->image && file_exists(public_path($course->image))) {
+                @unlink(public_path($course->image));
             }
 
-            $validator = Validator::make($request->all(), [
-                'title' => 'sometimes|string|max:255|unique:courses,title,' . $id,
-                'description' => 'sometimes|string',
-                'price' => 'sometimes|numeric|min:0',
-                'level' => 'sometimes|in:beginner,intermediate,advanced',
-                'duration_hours' => 'nullable|integer|min:0',
-                'requirements' => 'nullable|string',
-                'instructor_name' => 'sometimes|string|max:255',
-                'language' => 'sometimes|string|max:10',
-                'grade' => 'sometimes|in:الاول,الثاني,الثالث',
-                'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-                'is_active' => 'sometimes|boolean',
-            ]);
+            $image = $request->file('image');
+            $filename = time() . '_' . uniqid() . '.' . $image->getClientOriginalExtension();
 
-            if ($validator->fails()) {
-                return $this->validationErrorResponse(new ValidationException($validator));
+            if (!$image->move(public_path('uploads/courses'), $filename)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'فشل في رفع الصورة الجديدة'
+                ], 500);
             }
 
-            $data = $request->except('image');
-
-            if ($request->hasFile('image')) {
-                // حذف الصورة القديمة
-                if ($course->image && Storage::disk('public')->exists($course->image)) {
-                    Storage::disk('public')->delete($course->image);
-                }
-
-                $image = $request->file('image');
-                $path = $image->store('courses', 'public');
-                $data['image'] = $path;
-            }
-
-            $course->update($data);
-
-            // مسح الكاش
-            Cache::forget('courses_' . md5(''));  // مسح كاش القائمة
-            Cache::forget('course_' . $id);       // مسح كاش الكورس المحدد
-
-            return $this->successResponse(
-                new CourseResource($course->fresh()),
-                [
-                    'ar' => 'تم تحديث الكورس بنجاح',
-                    'en' => 'Course updated successfully'
-                ]
-            );
-
-        } catch (ModelNotFoundException $e) {
-            return $this->errorResponse([
-                'ar' => 'الكورس غير موجود',
-                'en' => 'Course not found'
-            ], 404);
-        } catch (\Exception $e) {
-            Log::error('Course update error', [
-                'course_id' => $id,
-                'error' => $e->getMessage()
-            ]);
-            return $this->serverErrorResponse();
+            $data['image'] = 'uploads/courses/' . $filename;
+        }else{
+            // إذا لم يتم رفع صورة جديدة، نترك المسار القديم كما هو
+            $data['image'] = $course->image;
         }
+
+        if (!$course->update($data)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'تعذر تحديث بيانات الكورس'
+            ], 500);
+        }   
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم تحديث الكورس بنجاح',
+            'data'    => $course->fresh()
+        ]);
+    } catch (ValidationException $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'خطأ في التحقق من البيانات',
+            'errors'  => $e->errors()
+        ], 422);
+    } catch (ModelNotFoundException $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'الكورس غير موجود'
+        ], 404);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'حدث خطأ غير متوقع',
+            'error'   => $e->getMessage()
+        ], 500);
     }
+}
+
+
+
 
     public function destroy($id)
     {

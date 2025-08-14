@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
 use App\Models\User;
-use App\Models\Course;
 use App\Traits\ApiResponseTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -26,13 +25,9 @@ class NotificationController extends Controller
 
             $notifications = Notification::forUser($user->id)
                 ->with(['course:id,title', 'sender:id,name'])
-                ->when($request->type, function ($query, $type) {
-                    return $query->byType($type);
-                })
-                ->when($request->has('unread_only'), function ($query) {
-                    return $query->unread();
-                })
-                ->orderBy('created_at', 'desc')
+                ->when($request->type, fn($query, $type) => $query->byType($type))
+                ->when($request->boolean('unread_only'), fn($query) => $query->unread())
+                ->orderByDesc('created_at')
                 ->paginate($perPage);
 
             return $this->successResponse($notifications, 'تم جلب الإشعارات بنجاح');
@@ -53,7 +48,6 @@ class NotificationController extends Controller
                 ->with(['course:id,title', 'sender:id,name'])
                 ->findOrFail($id);
 
-            // تمييز الإشعار كمقروء عند عرضه
             if (!$notification->is_read) {
                 $notification->markAsRead();
             }
@@ -140,8 +134,7 @@ class NotificationController extends Controller
     public function sendNotification(Request $request)
     {
         try {
-            // التحقق من أن المستخدم إدارة
-            if (!Auth::user()->Role === 'admin') {
+            if (Auth::user()->role !== 'admin') {
                 return $this->errorResponse('ليس لديك صلاحية لهذا الإجراء', 403);
             }
 
@@ -152,7 +145,7 @@ class NotificationController extends Controller
                 'user_ids' => 'array|exists:users,id',
                 'course_id' => 'nullable|exists:courses,id',
                 'send_to_all' => 'boolean',
-                'gender' => 'nullable|in:male,female',
+                'gender' => 'nullable|in:male,female,both',
                 'data' => 'nullable|array'
             ]);
 
@@ -161,48 +154,27 @@ class NotificationController extends Controller
             }
 
             $admin = Auth::user();
-            $notifications = [];
+            $users = collect();
 
-            // تحديد المستخدمين المستهدفين
             if ($request->send_to_all) {
-                // إرسال لجميع الطلبة
-                $usersQuery = User::where('role', 'student');
-
-                // فلترة حسب الجنس إذا تم تحديده
-                if ($request->gender) {
-                    $usersQuery->where('gender', $request->gender);
-                }
-
-                $users = $usersQuery->get();
+                $users = User::where('role', 'student')
+                    ->when($request->gender, fn($q, $g) => $q->where('gender', $g))
+                    ->get();
             } elseif ($request->course_id) {
-                // إرسال لطلبة كورس محدد
-                $usersQuery = User::whereHas('subscriptions', function ($query) use ($request) {
+                $users = User::whereHas('subscriptions', function ($query) use ($request) {
                     $query->where('course_id', $request->course_id)
-                          ->where('is_active', true)
-                          ->where('status', 'approved');
-                });
-
-                // فلترة حسب الجنس إذا تم تحديده
-                if ($request->gender) {
-                    $usersQuery->where('gender', $request->gender);
-                }
-
-                $users = $usersQuery->get();
+                        ->where('is_active', true)
+                        ->where('status', 'approved');
+                })->when($request->gender, fn($q, $g) => $q->where('gender', $g))
+                  ->get();
             } else {
-                // إرسال لمستخدمين محددين
-                $usersQuery = User::whereIn('id', $request->user_ids ?? []);
-
-                // فلترة حسب الجنس إذا تم تحديده
-                if ($request->gender) {
-                    $usersQuery->where('gender', $request->gender);
-                }
-
-                $users = $usersQuery->get();
+                $users = User::whereIn('id', $request->user_ids ?? [])
+                    ->when($request->gender, fn($q, $g) => $q->where('gender', $g))
+                    ->get();
             }
 
-            // إنشاء الإشعارات
             foreach ($users as $user) {
-                $notifications[] = Notification::create([
+                Notification::create([
                     'title' => $request->title,
                     'message' => $request->message,
                     'type' => $request->type,
@@ -214,7 +186,7 @@ class NotificationController extends Controller
             }
 
             return $this->successResponse([
-                'notifications_sent' => count($notifications),
+                'notifications_sent' => $users->count(),
                 'recipients' => $users->count()
             ], 'تم إرسال الإشعارات بنجاح');
 
@@ -229,7 +201,7 @@ class NotificationController extends Controller
     public function statistics()
     {
         try {
-            if (!Auth::user()->Role === 'admin') {
+            if (Auth::user()->role !== 'admin') {
                 return $this->errorResponse('ليس لديك صلاحية لهذا الإجراء', 403);
             }
 
@@ -240,7 +212,7 @@ class NotificationController extends Controller
                     ->groupBy('type')
                     ->pluck('count', 'type'),
                 'recent_notifications' => Notification::with(['user:id,name', 'course:id,title'])
-                    ->orderBy('created_at', 'desc')
+                    ->orderByDesc('created_at')
                     ->limit(10)
                     ->get()
             ];

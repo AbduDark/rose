@@ -17,6 +17,69 @@ class SubscriptionController extends Controller
 {
     use ApiResponseTrait;
 
+   public function getSubscriptions(Request $request)
+{
+    try {
+        $user = Auth::user();
+
+        // التحقق من أن المستخدم له دور admin
+        if ($user->role !== 'admin') {
+            return $this->errorResponse([
+                'ar' => 'غير مسموح لك بالوصول إلى هذه البيانات',
+                'en' => 'You are not authorized to access this data'
+            ], 403);
+        }
+
+        $subscriptions = Subscription::with(['course', 'user', 'approvedBy', 'rejectedBy'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return $this->successResponse([
+            'subscriptions' => $subscriptions
+        ], [
+            'ar' => 'تم جلب جميع الاشتراكات بنجاح',
+            'en' => 'All subscriptions retrieved successfully'
+        ]);
+
+    } catch (\Exception $e) {
+        return $this->serverErrorResponse();
+    }
+}
+public function adminIndex(Request $request)
+{
+    try {
+        $user = Auth::user();
+
+        // التحقق من أن المستخدم له دور admin
+        if ($user->role !== 'admin') {
+            return $this->errorResponse([
+                'ar' => 'غير مسموح لك بالوصول إلى هذه البيانات',
+                'en' => 'You are not authorized to access this data'
+            ], 403);
+        }
+
+        // جلب جميع الاشتراكات مع العلاقات
+        $subscriptions = Subscription::with([
+                'course',
+                'user',
+                'approvedBy',
+                'rejectedBy'
+            ])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return $this->successResponse([
+            'subscriptions' => $subscriptions
+        ], [
+            'ar' => 'تم جلب جميع الاشتراكات بنجاح',
+            'en' => 'All subscriptions retrieved successfully'
+        ]);
+
+    } catch (\Exception $e) {
+        return $this->serverErrorResponse();
+    }
+}
+
    public function subscribe(Request $request)
     {
         try {

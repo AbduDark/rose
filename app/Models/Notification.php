@@ -22,14 +22,11 @@ class Notification extends Model
         'data'
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'is_read' => 'boolean',
-            'read_at' => 'datetime',
-            'data' => 'array',
+    protected $casts = [
+    'is_read' => 'boolean',
+    'read_at' => 'datetime',
+    'data' => 'array',
         ];
-    }
 
     public function user(): BelongsTo
     {

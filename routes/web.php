@@ -46,8 +46,3 @@ Route::get('/email-verified', function () {
     return response()->file(public_path('email-verified.html'));
 });
 
-Route::get('/test-course-image', function () {
-    $filename = app(\App\Services\CourseImageGenerator::class)
-        ->generateCourseImage('كورس تجريبي', 150, '', 'الثالث');
-    return 'تم إنشاء الصورة: ' . $filename;
-});

@@ -9,6 +9,8 @@ use App\Models\Course;
 use App\Models\Subscription; // Import Subscription model
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use App\Models\User;
 class LessonController extends Controller
 {
     use ApiResponseTrait;
@@ -38,6 +40,7 @@ class LessonController extends Controller
 
         return response()->json($lessons);
     }
+       
 
     public function store(Request $request)
     {
@@ -89,6 +92,7 @@ class LessonController extends Controller
     public function show($id)
     {
         try {
+              /** @var User $user */
             $user = auth()->user();
 
             if (!$user) {

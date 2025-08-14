@@ -233,32 +233,34 @@ class AdminController extends BaseController
     }
 
     // إدارة الاشتراكات
-    public function getSubscriptions(Request $request)
-    {
-        try {
-            $query = Subscription::with(['user', 'course', 'approvedBy', 'rejectedBy']);
+   public function getSubscriptions(Request $request)
+{
+    try {
+        $user = Auth::user();
 
-            if ($request->has('status')) {
-                $query->where('status', $request->get('status'));
-            }
-
-            if ($request->has('course_id')) {
-                $query->where('course_id', $request->get('course_id'));
-            }
-
-            $subscriptions = $query->orderBy('created_at', 'desc')
-                                  ->paginate($request->get('per_page', 15));
-
-            return $this->successResponse($subscriptions, [
-                'ar' => 'تم جلب قائمة الاشتراكات بنجاح',
-                'en' => 'Subscriptions retrieved successfully'
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Admin get subscriptions error: ' . $e->getMessage());
-            return $this->serverErrorResponse();
+        // التحقق من أن المستخدم له دور admin
+        if ($user->role !== 'admin') {
+            return $this->errorResponse([
+                'ar' => 'غير مسموح لك بالوصول إلى هذه البيانات',
+                'en' => 'You are not authorized to access this data'
+            ], 403);
         }
+
+        $subscriptions = Subscription::with(['course', 'user', 'approvedBy', 'rejectedBy'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return $this->successResponse([
+            'subscriptions' => $subscriptions
+        ], [
+            'ar' => 'تم جلب جميع الاشتراكات بنجاح',
+            'en' => 'All subscriptions retrieved successfully'
+        ]);
+
+    } catch (\Exception $e) {
+        return $this->serverErrorResponse();
     }
+}
 
     public function getPendingSubscriptions(Request $request)
     {

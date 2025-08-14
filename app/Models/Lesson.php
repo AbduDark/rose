@@ -10,16 +10,10 @@ class Lesson extends Model
     use HasFactory;
 
     protected $fillable = [
-        'course_id',
-        'title',
-        'description',
-        'content',
-        'video_url',
-        'order',
-        'duration_minutes',
-        'is_free',
-        'target_gender'
-    ];
+  'course_id','title','description','content',
+  'order','duration_minutes','is_free','target_gender',
+  'video_path','hls_dir','hls_master','hls_key_path'
+];
 
     protected function casts(): array
     {

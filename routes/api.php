@@ -13,7 +13,8 @@ use App\Http\Controllers\Api\{
     PaymentController,
     UserController,
     AdminController,
-    NotificationController
+    NotificationController,
+    LessonVideoController
 };
 use App\Http\Middleware\AdminMiddleware;
 
@@ -61,7 +62,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Authentication
     Route::prefix('auth')->group(function () {
         Route::get('profile',   [AuthController::class, 'profile']);
-        Route::put('profile',   [AuthController::class, 'updateProfile']);
+        Route::put('update',   [AuthController::class, 'update']);
         Route::put('password',         [AuthController::class, 'changePassword']);
         Route::patch('profile', [AuthController::class, 'updateProfile']);
         Route::post('refresh',  [AuthController::class, 'refresh']);
@@ -97,6 +98,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Lessons
     Route::get('courses/{id}/lessons',                 [LessonController::class, 'index']);
     Route::get('lessons/{id}',                         [LessonController::class, 'show']);
+    Route::get('/lessons/{lesson}/stream',              [LessonVideoController::class, 'stream']);
+    Route::get('/lessons/{lesson}/key', [LessonVideoController::class, 'getKey'])->name('video.key');
 
     // Ratings
     Route::post('ratings',                             [RatingController::class, 'store']);
